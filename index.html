@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>노원다인치과병원 임직원 포털</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js (Core) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+        
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #F3F4F6; color: #1F2937; overflow: hidden; }
+        
+        /* 스크롤바 숨기기 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 모바일 스케줄표 고정 열 (Sticky Columns) */
+        .sticky-col-1 { position: sticky; left: 0; background-color: #f9fafb; z-index: 10; border-right: 1px solid #e5e7eb; box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05); }
+        .sticky-col-2 { position: sticky; left: 4rem; background-color: #ffffff; z-index: 10; border-right: 1px solid #e5e7eb; box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05); }
+        .sticky-col-3 { position: sticky; left: 8rem; background-color: #eff6ff; z-index: 10; border-right: 1px solid #e5e7eb; box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); }
+        
+        /* 헤더용 고정 열 (z-index를 더 높게) */
+        .thead-sticky-1 { position: sticky; left: 0; background-color: #f3f4f6; z-index: 20; border-right: 1px solid #d1d5db; }
+        .thead-sticky-2 { position: sticky; left: 4rem; background-color: #f3f4f6; z-index: 20; border-right: 1px solid #d1d5db; }
+        .thead-sticky-3 { position: sticky; left: 8rem; background-color: #f3f4f6; z-index: 20; border-right: 1px solid #d1d5db; }
+
+        /* 달력 그리드 */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background-color: #f3f4f6;
+            border: 1px solid #e5e7eb;
+        }
+        .calendar-cell { background-color: white; }
+
+        /* SVG 로고 스타일 */
+        .brand-logo-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col antialiased" x-data="portalApp()">
+
+    <header class="bg-white/95 backdrop-blur-md border-b border-gray-200 px-3 md:px-4 py-2 md:py-3 flex flex-row justify-between items-center z-30 shrink-0 h-14 md:h-16 shadow-sm">
+        
+        <!-- 깨지지 않는 100% 자체 제작 SVG 로고 -->
+        <div class="flex items-center cursor-pointer shrink-0 gap-2 md:gap-3" @click="changeView('gateway')">
+            <div class="relative w-8 h-8 md:w-10 md:h-10 flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 100 100" class="brand-logo-svg drop-shadow-sm">
+                    <!-- 왼쪽 사람/치아 조각 (진한 파랑) -->
+                    <path d="M50,95 C30,95 15,80 15,60 C15,50 20,40 28,34 C30,32 35,32 38,34 C45,39 50,45 50,55 C50,60 48,65 45,68 C42,71 40,75 40,80 C40,85 45,90 50,90 Z" fill="#1E40AF"/>
+                    <circle cx="28" cy="22" r="7" fill="#1E40AF"/>
+                    
+                    <!-- 오른쪽 사람/치아 조각 (밝은 파랑) -->
+                    <path d="M50,95 C70,95 85,80 85,60 C85,50 80,40 72,34 C70,32 65,32 62,34 C55,39 50,45 50,55 C50,60 52,65 55,68 C58,71 60,75 60,80 C60,85 55,90 50,90 Z" fill="#3B82F6"/>
+                    <circle cx="72" cy="22" r="7" fill="#3B82F6"/>
+                    
+                    <!-- 겹치는 부분 디테일 -->
+                    <path d="M50,55 C45,50 40,42 35,38 C35,35 40,32 45,32 C50,32 55,35 60,38 C60,42 55,50 50,55 Z" fill="#2563EB"/>
+                </svg>
+            </div>
+            <div class="flex flex-col justify-center">
+                <span class="text-[7px] md:text-[9px] font-black tracking-widest text-gray-500 leading-none mb-0.5">NO.1 DAIN</span>
+                <div class="text-[16px] md:text-[20px] font-black leading-none tracking-tighter flex items-center mb-0.5">
+                    <span class="text-[#2B6CB0]">다인</span><span class="text-gray-600">치과병원</span>
+                </div>
+                <span class="text-[5px] md:text-[6.5px] font-bold tracking-[0.15em] text-gray-400 leading-none uppercase">Global Dental Hospital</span>
+            </div>
+        </div>
+        
+        <div class="flex flex-row items-center gap-2 md:gap-3 ml-auto">
+            <!-- 실시간 방문자 -->
+            <div class="flex flex-col items-end mr-1">
+                <div class="text-[9px] md:text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-full border border-gray-200 shadow-inner flex items-center gap-1">
+                    <span>오늘접속 <span class="font-bold text-blue-600" x-text="todayVisitors"></span></span>
+                    <span class="text-gray-300">|</span>
+                    <span>누적 <span class="font-bold text-gray-700" x-text="totalVisitors"></span></span>
+                </div>
+            </div>
+            
+            <button x-show="!isAdminMode" @click="adminLogin" class="flex items-center gap-1.5 px-2 py-1 md:px-3 md:py-1.5 bg-white border border-gray-300 rounded-lg text-[10px] md:text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
+                <i class="fa-solid fa-lock"></i> <span class="hidden md:inline">관리자</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 게이트웨이 화면 (1화면 핏 유지) -->
+    <main class="flex-grow flex flex-col overflow-hidden relative" x-show="currentView === 'gateway' && !isAdminMode" x-cloak>
+        <div class="flex-grow overflow-y-auto no-scrollbar pb-16 md:pb-0">
+            <!-- p-2 to reduce padding, max-w-5xl to constrain width nicely -->
+            <div class="max-w-5xl mx-auto w-full p-2 md:p-4 flex flex-col h-full gap-2 md:gap-4 justify-center md:pt-4">
+                
+                <!-- 환영 메시지 (높이 축소) -->
+                <div class="text-center mb-1 md:mb-2 flex-shrink-0">
+                    <div class="inline-block relative mb-1">
+                        <h2 class="text-[10px] md:text-xs font-bold text-blue-600 tracking-widest uppercase bg-blue-50 px-3 py-0.5 md:py-1 rounded-full">Employee Portal</h2>
+                    </div>
+                    <h1 class="text-lg md:text-3xl font-black text-gray-900 leading-tight mb-1" x-html="data.gatewayInfo.welcomeTitle.replace(/\n/g, '<br>')"></h1>
+                    <p class="text-[10px] md:text-sm text-gray-500 font-medium leading-snug" x-html="data.gatewayInfo.welcomeSub.replace(/\n/g, '<br>')"></p>
+                </div>
+
+                <!-- 4개 메인 카드 메뉴 (그리드 간격 축소, 패딩 축소) -->
+                <div class="grid grid-cols-4 gap-1.5 md:gap-3 flex-shrink-0 px-1">
+                    <template x-for="(menu, key) in data.gatewayInfo.menus" :key="key">
+                        <button @click="changeView(key)" class="group bg-white p-2 md:p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-300 transition-all text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[80px] md:min-h-[110px]">
+                            <div class="w-8 h-8 md:w-12 md:h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm md:text-xl mb-1.5 md:mb-2 group-hover:scale-110 transition-transform shadow-inner">
+                                <i :class="menu.icon"></i>
+                            </div>
+                            <div class="font-bold text-gray-800 text-[10px] md:text-sm mb-0.5 leading-tight" x-text="menu.title"></div>
+                            <div class="text-[8px] md:text-[10px] text-gray-400 font-medium hidden md:block" x-text="menu.desc"></div>
+                            
+                            <template x-if="key === 'schedule'">
+                                <span class="absolute top-1 right-1 md:top-2 md:right-2 bg-red-500 text-white text-[7px] md:text-[9px] font-bold px-1 py-0.5 rounded shadow-sm">실시간</span>
+                            </template>
+                        </button>
+                    </template>
+                </div>
+
+                <!-- 하단 영역 (스케줄 달력 + 링크 & OJT) - 높이를 채우도록 flex-grow -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 flex-grow overflow-hidden px-1">
+                    
+                    <!-- 스케줄 프리뷰 달력 (높이 최적화) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-2 md:p-3 flex flex-col min-h-[220px]">
+                        <div class="flex justify-between items-center mb-1.5 md:mb-2">
+                            <h3 class="font-bold text-[11px] md:text-sm text-blue-700 flex items-center gap-1.5">
+                                <i class="fa-solid fa-calendar-check text-blue-500"></i>
+                                <span x-text="`${currentYear}년 ${currentMonth}월 진료일정`"></span>
+                            </h3>
+                            <div class="flex gap-1">
+                                <button @click="prevMonth" class="w-5 h-5 md:w-6 md:h-6 rounded bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-200 border border-gray-200"><i class="fa-solid fa-chevron-left text-[8px]"></i></button>
+                                <button @click="nextMonth" class="w-5 h-5 md:w-6 md:h-6 rounded bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-200 border border-gray-200"><i class="fa-solid fa-chevron-right text-[8px]"></i></button>
+                            </div>
+                        </div>
+                        <div class="calendar-grid rounded-lg overflow-hidden flex-grow h-full">
+                            <template x-for="day in ['일','월','화','수','목','금','토']" :key="'header_'+day">
+                                <div class="text-center font-bold text-[9px] md:text-[10px] py-1 bg-gray-50 text-gray-500 border-b border-gray-200 flex items-center justify-center"
+                                     :class="day === '일' ? 'text-red-500' : (day === '토' ? 'text-blue-500' : '')" x-text="day"></div>
+                            </template>
+                            <template x-for="dateObj in calendarDays" :key="dateObj.id">
+                                <div class="calendar-cell p-0.5 flex flex-col items-center justify-center relative">
+                                    <template x-if="dateObj.date">
+                                        <div class="w-full h-full flex flex-col items-center justify-center rounded"
+                                             :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'bg-red-50/30' : ''">
+                                            <span class="text-[10px] md:text-xs font-bold leading-none"
+                                                  :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'text-red-500' : (dateObj.dow === 6 ? 'text-blue-600' : 'text-gray-800')"
+                                                  x-text="dateObj.date"></span>
+                                            <span class="text-[7px] md:text-[8px] font-bold mt-0.5 leading-none"
+                                                  :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'text-red-500' : 'text-gray-400'"
+                                                  x-text="isHoliday(dateObj.dateStr, dateObj.dow) ? '휴무' : '정상'"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- 우측 링크 & OJT -->
+                    <div class="flex flex-col gap-2 md:gap-3">
+                        <!-- 홈페이지 & 블로그 버튼 (컴팩트) -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="https://www.ndaindental.co.kr/" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white p-2 md:p-3 rounded-xl shadow-sm transition-colors flex items-center gap-2 group">
+                                <div class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-home text-sm"></i>
+                                </div>
+                                <div class="overflow-hidden flex-grow">
+                                    <div class="font-bold text-[10px] md:text-xs truncate">공식 홈페이지</div>
+                                    <div class="text-[8px] text-blue-200 truncate">ndaindental.co.kr</div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-[10px] opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all shrink-0"></i>
+                            </a>
+                            <a href="https://blog.naver.com/nndain" target="_blank" class="bg-[#03C75A] hover:bg-[#02b350] text-white p-2 md:p-3 rounded-xl shadow-sm transition-colors flex items-center gap-2 group">
+                                <div class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                    <i class="fa-brands fa-blogger-b text-sm"></i>
+                                </div>
+                                <div class="overflow-hidden flex-grow">
+                                    <div class="font-bold text-[10px] md:text-xs truncate">공식 블로그</div>
+                                    <div class="text-[8px] text-green-200 truncate">blog.naver.com</div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-[10px] opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all shrink-0"></i>
+                            </a>
+                        </div>
+                        
+                        <!-- 사내 OJT (flex-grow로 높이 맞춤) -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 flex-grow flex flex-col overflow-hidden">
+                            <h3 class="font-bold text-sm md:text-base text-gray-800 mb-2 flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-book-open text-green-600"></i> 사내 OJT 바로가기
+                            </h3>
+                            <div class="space-y-2 overflow-y-auto no-scrollbar flex-grow">
+                                <div class="bg-gray-50 border border-gray-100 rounded-lg p-2.5 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <div class="text-green-500 w-4 h-4 flex items-center justify-center bg-white rounded shadow-sm border border-gray-200 shrink-0"><i class="fa-solid fa-check text-[10px]"></i></div>
+                                    <span class="text-xs md:text-sm text-gray-700 font-bold truncate">[공통] 신규 입사자 가이드</span>
+                                </div>
+                                <div class="bg-gray-50 border border-gray-100 rounded-lg p-2.5 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <div class="text-green-500 w-4 h-4 flex items-center justify-center bg-white rounded shadow-sm border border-gray-200 shrink-0"><i class="fa-solid fa-check text-[10px]"></i></div>
+                                    <span class="text-xs md:text-sm text-gray-700 font-bold truncate">[필수] 취업규칙 확인</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 실시간 업데이트 알림 (둥둥 떠다니지 않고 레이아웃 하단에 예쁘게 고정/통합) -->
+                <div class="mt-auto pt-2 md:pt-4 w-full shrink-0">
+                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 md:p-4 flex items-center justify-between w-full">
+                        <div class="flex items-center gap-3 w-full">
+                            <span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 text-xs md:text-sm">
+                                <i class="fa-solid fa-bullhorn"></i> 업데이트
+                            </span>
+                            <span class="text-gray-700 truncate font-medium flex-grow text-sm md:text-base" x-text="data.gatewayInfo.latestUpdate.text"></span>
+                            <span class="text-gray-400 text-xs md:text-sm shrink-0 font-medium" x-text="data.gatewayInfo.latestUpdate.date"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 서브페이지 공통 영역 -->
+    <main class="flex-grow flex flex-col h-full bg-gray-50 overflow-hidden relative" x-show="currentView !== 'gateway' && !isAdminMode" x-cloak>
+        
+        <!-- 서브페이지 상단 헤더 -->
+        <div class="bg-white px-3 py-2 md:px-4 md:py-3 flex items-center justify-between border-b border-gray-200 shrink-0 shadow-sm z-20">
+            <button @click="changeView('gateway')" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 transition-colors">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+            <h2 class="font-bold text-gray-800 text-sm md:text-base" x-text="getSubPageTitle()"></h2>
+            <div class="w-7 h-7 md:w-8 md:h-8"></div>
+        </div>
+
+        <div class="flex-grow overflow-y-auto w-full relative">
+            
+            <!-- 병원 소개 화면 -->
+            <template x-if="currentView === 'info'">
+                <div class="p-4 md:p-6 pb-12 max-w-4xl mx-auto space-y-6">
+                    <!-- 컬러풀한 병원 소개 -->
+                    <div class="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl shadow-lg p-6 md:p-8 text-center text-white relative overflow-hidden">
+                        <!-- 배경 장식 -->
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-1/2 -translate-y-1/2"></div>
+                        <div class="absolute bottom-0 left-0 w-24 h-24 bg-blue-400/20 rounded-full blur-xl transform -translate-x-1/2 translate-y-1/2"></div>
+                        
+                        <div class="relative z-10 flex flex-col items-center">
+                            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-md">
+                                <svg viewBox="0 0 100 100" class="w-10 h-10 drop-shadow-sm">
+                                    <path d="M50,95 C30,95 15,80 15,60 C15,50 20,40 28,34 C30,32 35,32 38,34 C45,39 50,45 50,55 C50,60 48,65 45,68 C42,71 40,75 40,80 C40,85 45,90 50,90 Z" fill="#1E40AF"/>
+                                    <circle cx="28" cy="22" r="7" fill="#1E40AF"/>
+                                    <path d="M50,95 C70,95 85,80 85,60 C85,50 80,40 72,34 C70,32 65,32 62,34 C55,39 50,45 50,55 C50,60 52,65 55,68 C58,71 60,75 60,80 C60,85 55,90 50,90 Z" fill="#3B82F6"/>
+                                    <circle cx="72" cy="22" r="7" fill="#3B82F6"/>
+                                    <path d="M50,55 C45,50 40,42 35,38 C35,35 40,32 45,32 C50,32 55,35 60,38 C60,42 55,50 50,55 Z" fill="#2563EB"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl md:text-3xl font-black mb-4 drop-shadow-md" x-text="data.companyInfo.title1"></h3>
+                            <p class="text-xs md:text-sm text-blue-100 leading-relaxed font-medium whitespace-pre-line bg-black/20 p-4 rounded-xl inline-block text-left" x-text="data.companyInfo.content1"></p>
+                        </div>
+                    </div>
+
+                    <!-- 핵심 가치 -->
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                        <div class="flex items-center gap-3 mb-4 pl-2">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner"><i class="fa-solid fa-gem text-lg"></i></div>
+                            <h3 class="text-lg md:text-xl font-bold text-gray-800" x-text="data.companyInfo.title2"></h3>
+                        </div>
+                        <div class="pl-2 space-y-3">
+                            <template x-for="(line, index) in data.companyInfo.content2.split('\n')" :key="index">
+                                <template x-if="line.trim() !== ''">
+                                    <div class="flex items-start gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                        <i class="fa-solid fa-check text-green-500 mt-1 text-xs"></i>
+                                        <p class="text-xs md:text-sm text-gray-700 font-medium" x-text="line"></p>
+                                    </div>
+                                </template>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- 직군별 스케줄 화면 (사용자용) -->
+            <template x-if="currentView === 'schedule'">
+                <div class="flex flex-col h-full bg-white relative">
+                    <!-- 스케줄 컨트롤 바 -->
+                    <div class="p-2 md:p-3 bg-gray-50 border-b border-gray-200 flex flex-wrap gap-2 items-center justify-between sticky top-0 z-30 shadow-sm shrink-0">
+                        <div class="flex items-center gap-2">
+                            <select x-model="selectedGroup" class="bg-white border border-gray-300 text-gray-700 text-xs md:text-sm font-bold rounded-lg p-1.5 md:p-2 focus:ring-blue-500 shadow-sm outline-none">
+                                <option value="전체">전체 파트 보기</option>
+                                <option value="치과의사">치과의사</option>
+                                <option value="치과위생사">치과위생사</option>
+                                <option value="코디네이터">코디네이터</option>
+                                <option value="경영지원">경영지원</option>
+                            </select>
+                            <div class="flex bg-white rounded-lg shadow-sm border border-gray-300 overflow-hidden">
+                                <button @click="prevMonth" class="px-2 md:px-3 py-1 md:py-1.5 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                                <div class="px-3 md:px-4 py-1 md:py-1.5 text-xs md:text-sm font-black text-gray-800 bg-gray-50 border-x border-gray-200 flex items-center justify-center min-w-[60px]" x-text="`${currentMonth}월`"></div>
+                                <button @click="nextMonth" class="px-2 md:px-3 py-1 md:py-1.5 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 스케줄 표 -->
+                    <div class="flex-grow overflow-auto bg-white relative no-scrollbar">
+                        <table class="w-full text-center border-collapse text-[9px] md:text-sm min-w-max">
+                            <thead class="sticky top-0 z-40 bg-gray-100 shadow-sm">
+                                <tr>
+                                    <th class="p-1 md:p-2 border-b border-gray-300 text-gray-600 font-bold w-12 md:w-16 thead-sticky-1 text-[9px] md:text-xs">직군</th>
+                                    <th class="p-1 md:p-2 border-b border-gray-300 text-gray-600 font-bold w-12 md:w-16 thead-sticky-2 text-[9px] md:text-xs">이름</th>
+                                    <th class="p-1 md:p-2 border-b border-gray-300 text-blue-600 font-bold w-10 md:w-16 thead-sticky-3 bg-blue-50 text-[9px] md:text-xs">잔여</th>
+                                    <template x-for="dateObj in calendarDays" :key="'th_'+dateObj.id">
+                                        <th class="border-b border-r border-gray-200 p-1 font-bold min-w-[28px] md:min-w-[44px]"
+                                            :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'text-red-500 bg-red-50/50' : (dateObj.dow === 6 ? 'text-blue-500 bg-blue-50/50' : 'text-gray-700')">
+                                            <div class="text-[9px] md:text-sm leading-none mb-0.5" x-text="dateObj.date"></div>
+                                            <div class="text-[7px] md:text-[10px] font-normal leading-none" x-text="['일','월','화','수','목','금','토'][dateObj.dow] || ''" x-show="dateObj.date !== ''"></div>
+                                        </th>
+                                    </template>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="emp in filteredEmployees" :key="'sched_'+emp.id">
+                                    <tr class="hover:bg-blue-50/30 transition-colors border-b border-gray-200 group">
+                                        <td class="p-1 md:p-2 font-bold text-gray-500 sticky-col-1 text-[9px] md:text-xs bg-gray-50" x-text="emp.group"></td>
+                                        <td class="p-1 md:p-2 font-black text-gray-800 sticky-col-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-blue-50/50 bg-white whitespace-nowrap text-[10px] md:text-sm" x-text="emp.name"></td>
+                                        <td class="p-1 md:p-2 font-bold text-blue-600 sticky-col-3 group-hover:bg-blue-100/50 bg-blue-50 text-[10px] md:text-sm" x-text="calculateRemainingLeaves(emp)"></td>
+                                        
+                                        <template x-for="dateObj in calendarDays" :key="'td_'+emp.id+'_'+dateObj.id">
+                                            <td class="p-0 border-r border-gray-200 relative"
+                                                :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'bg-red-50/20' : ''">
+                                                <div class="w-full h-7 md:h-10 flex items-center justify-center font-bold text-[9px] md:text-xs"
+                                                     :class="getCellStyle(emp.id, dateObj.dateStr).textClass + ' ' + getCellStyle(emp.id, dateObj.dateStr).bgClass"
+                                                     x-text="getCellStyle(emp.id, dateObj.dateStr).text">
+                                                </div>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </template>
+                                <tr x-show="filteredEmployees.length === 0">
+                                    <td :colspan="calendarDays.length + 3" class="p-10 text-gray-400 text-xs md:text-sm">등록된 직원이 없거나 선택된 직군이 없습니다.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </template>
+            
+            <template x-if="currentView === 'welfare' || currentView === 'qa'">
+                <div class="flex items-center justify-center h-full text-gray-400 font-medium pb-20">
+                    <div class="text-center">
+                        <i class="fa-solid fa-person-digging text-3xl md:text-4xl mb-3 text-gray-300"></i>
+                        <p class="text-sm md:text-base">해당 메뉴는 현재 준비 중입니다.</p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- 관리자 모드 -->
+    <main class="flex-grow flex flex-col h-full bg-gray-100 relative z-50" x-show="isAdminMode" x-cloak>
+        <!-- 관리자 상단 헤더 -->
+        <div class="bg-gray-900 text-white px-3 md:px-4 py-2 md:py-3 flex items-center justify-between shrink-0 shadow-md z-30">
+            <div class="flex items-center gap-2 md:gap-3">
+                <div class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-blue-600 flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-user-shield text-[10px] md:text-sm"></i>
+                </div>
+                <h2 class="font-bold text-[11px] md:text-lg tracking-wide">포털 관리자 모드</h2>
+            </div>
+            <div class="flex gap-1.5 md:gap-2">
+                <button @click="saveAllDataAndNotify" class="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-[9px] md:text-sm font-bold transition-colors flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk text-[10px] md:text-sm"></i> <span class="hidden md:inline">전체 저장</span><span class="md:hidden">저장</span>
+                </button>
+                <button @click="adminLogout" class="px-2 py-1 md:px-3 md:py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-[9px] md:text-sm font-bold transition-colors flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-person-walking-arrow-right text-[10px] md:text-sm"></i> <span class="hidden md:inline">나가기</span><span class="md:hidden">종료</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row h-full overflow-hidden">
+            <!-- 관리자 탭 메뉴 -->
+            <div class="bg-white w-full md:w-48 shrink-0 flex flex-row md:flex-col border-b md:border-r border-gray-200 overflow-x-auto no-scrollbar shadow-sm z-20">
+                <template x-for="tab in adminTabs" :key="tab.id">
+                    <button @click="adminTab = tab.id; if(tab.id==='stats') $nextTick(() => renderChart());" 
+                            class="px-3 py-2.5 md:py-4 text-[10px] md:text-sm font-bold flex items-center justify-center md:justify-start gap-1.5 md:gap-3 border-b-2 md:border-b-0 md:border-l-4 transition-colors whitespace-nowrap"
+                            :class="adminTab === tab.id ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-transparent text-gray-500 hover:bg-gray-50'">
+                        <i class="fa-solid w-4 text-center text-xs md:text-sm" :class="tab.icon"></i> 
+                        <span x-text="tab.name"></span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- 관리자 메인 컨텐츠 영역 -->
+            <div class="flex-grow overflow-y-auto bg-gray-50 p-3 md:p-6 pb-20 no-scrollbar">
+                
+                <!-- 1. 통계 (조회/통계 탭) -->
+                <template x-if="adminTab === 'stats'">
+                    <div class="max-w-4xl mx-auto space-y-4">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-line text-blue-500"></i> 방문자 통계 현황</h3>
+                            
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                <div class="bg-blue-50 rounded-lg p-4 text-center border border-blue-100">
+                                    <div class="text-[10px] text-blue-500 font-bold mb-1">오늘 방문자</div>
+                                    <div class="text-2xl font-black text-blue-700" x-text="todayVisitors"></div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
+                                    <div class="text-[10px] text-gray-500 font-bold mb-1">누적 방문자</div>
+                                    <div class="text-2xl font-black text-gray-700" x-text="totalVisitors"></div>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-4 text-center border border-green-100 col-span-2 md:col-span-2 flex flex-col justify-center">
+                                    <div class="text-[10px] text-green-600 font-bold mb-1">최근 7일 일평균</div>
+                                    <div class="text-xl font-black text-green-700">약 145명</div>
+                                </div>
+                            </div>
+
+                            <div class="h-64 w-full">
+                                <canvas id="visitorChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 2. 메인 텍스트 관리 -->
+                <template x-if="adminTab === 'text'">
+                    <div class="space-y-4 max-w-3xl mx-auto">
+                        <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2 border-b pb-2 text-sm md:text-base"><i class="fa-solid fa-home text-blue-500"></i> 게이트웨이 환영사</h3>
+                            <div class="space-y-3">
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">메인 타이틀 (\n 입력시 줄바꿈)</label><input type="text" x-model="data.gatewayInfo.welcomeTitle" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">서브 타이틀</label><input type="text" x-model="data.gatewayInfo.welcomeSub" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2 border-b pb-2 text-sm md:text-base"><i class="fa-solid fa-hospital text-blue-500"></i> 병원 소개글</h3>
+                            <div class="space-y-3">
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">소개 제목</label><input type="text" x-model="data.companyInfo.title1" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">소개 내용</label><textarea x-model="data.companyInfo.content1" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea></div>
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">비전 제목</label><input type="text" x-model="data.companyInfo.title2" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                                <div><label class="text-xs md:text-sm font-bold text-gray-500 block mb-1">비전 내용 (줄바꿈으로 항목 구분)</label><textarea x-model="data.companyInfo.content2" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm md:text-base h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 3. 직원 관리 -->
+                <template x-if="adminTab === 'emp'">
+                    <div class="space-y-4 max-w-5xl mx-auto">
+                        <!-- 신규 직원 등록 폼 -->
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-green-500">
+                            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm md:text-base"><i class="fa-solid fa-user-plus text-green-500"></i> 신규 직원 등록</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 items-end">
+                                <div>
+                                    <label class="text-xs md:text-sm font-bold text-gray-500 mb-1 block">직군</label>
+                                    <select x-model="newEmp.group" class="w-full border border-gray-300 rounded-lg p-2 md:p-2.5 text-sm md:text-base focus:border-green-500 outline-none bg-white">
+                                        <option value="치과의사">치과의사</option>
+                                        <option value="치과위생사">치과위생사</option>
+                                        <option value="코디네이터">코디네이터</option>
+                                        <option value="경영지원">경영지원</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs md:text-sm font-bold text-gray-500 mb-1 block">이름</label>
+                                    <input type="text" x-model="newEmp.name" class="w-full border border-gray-300 rounded-lg p-2 md:p-2.5 text-sm md:text-base focus:border-green-500 outline-none" placeholder="이름 입력">
+                                </div>
+                                <div>
+                                    <label class="text-xs md:text-sm font-bold text-gray-500 mb-1 block">입사일</label>
+                                    <input type="date" x-model="newEmp.joinDate" class="w-full border border-gray-300 rounded-lg p-2 md:p-2.5 text-sm md:text-base focus:border-green-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs md:text-sm font-bold text-gray-500 mb-1 block">이전 사용연차</label>
+                                    <input type="number" step="0.5" x-model.number="newEmp.usedLeaves" class="w-full border border-gray-300 rounded-lg p-2 md:p-2.5 text-sm md:text-base focus:border-green-500 outline-none" placeholder="숫자">
+                                </div>
+                                <button @click="addEmployee" class="w-full col-span-2 md:col-span-1 py-2 md:py-2.5 bg-green-600 text-white rounded-lg text-sm md:text-base font-bold hover:bg-green-700 transition-colors shadow-sm">등록</button>
+                            </div>
+                        </div>
+
+                        <!-- 직원 명단 테이블 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div class="p-3 md:p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 flex items-center gap-2 mb-1 text-sm md:text-base"><i class="fa-solid fa-list-ul text-blue-500"></i> 직원 명단 및 실시간 연차 현황</h3>
+                                    <p class="text-[9px] md:text-xs text-red-500 font-bold">* 스케줄표에 입력된 휴무(연차/반차)는 [오늘 날짜] 기준으로 자동 차감됩니다.</p>
+                                </div>
+                                <button @click="exportToExcel('emp')" class="px-2 py-1 md:px-3 md:py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-[9px] md:text-xs font-bold hover:bg-green-100 flex items-center gap-1.5 transition-colors shrink-0">
+                                    <i class="fa-solid fa-file-excel"></i> 엑셀 다운로드
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto no-scrollbar">
+                                <table class="w-full text-center text-[10px] md:text-sm border-collapse min-w-[500px]">
+                                    <thead class="bg-gray-100 text-gray-600 text-[9px] md:text-xs border-b border-gray-300">
+                                        <tr>
+                                            <th class="p-2 md:p-3">No.</th>
+                                            <th class="p-2 md:p-3">직군</th>
+                                            <th class="p-2 md:p-3">이름</th>
+                                            <th class="p-2 md:p-3">입사일</th>
+                                            <th class="p-2 md:p-3 text-blue-700 bg-blue-50/50">총 발생</th>
+                                            <th class="p-2 md:p-3 text-red-700 bg-red-50/50">사용</th>
+                                            <th class="p-2 md:p-3 text-green-700 bg-green-50/50">잔여</th>
+                                            <th class="p-2 md:p-3">삭제</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        <template x-for="(emp, idx) in data.employees" :key="'list_'+emp.id">
+                                            <tr class="hover:bg-gray-50 transition-colors">
+                                                <td class="p-2 md:p-3 text-gray-400 text-[9px] md:text-xs" x-text="idx + 1"></td>
+                                                <td class="p-2 md:p-3 font-bold text-gray-600" x-text="emp.group"></td>
+                                                <td class="p-2 md:p-3 font-black text-gray-900" x-text="emp.name"></td>
+                                                <td class="p-2 md:p-3 text-gray-500 text-[9px] md:text-xs" x-text="emp.joinDate"></td>
+                                                <td class="p-2 md:p-3 font-bold text-blue-600 bg-blue-50/10" x-text="calculateTotalLeaves(emp)"></td>
+                                                <td class="p-2 md:p-3 font-bold text-red-500 bg-red-50/10" x-text="(calculateTotalLeaves(emp) - calculateRemainingLeaves(emp)).toFixed(1)"></td>
+                                                <td class="p-2 md:p-3 font-black text-green-600 bg-green-50/10 text-xs md:text-base" x-text="calculateRemainingLeaves(emp)"></td>
+                                                <td class="p-2 md:p-3">
+                                                    <button @click="removeEmployee(emp.id)" class="w-5 h-5 md:w-7 md:h-7 rounded bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center mx-auto"><i class="fa-solid fa-trash-can text-[9px] md:text-xs"></i></button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="data.employees.length === 0">
+                                            <td colspan="8" class="p-8 text-gray-400 text-xs text-center">등록된 직원이 없습니다.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 4. 스케줄 작성 (달력 + 편집기) -->
+                <template x-if="adminTab === 'schedule'">
+                    <div class="space-y-4 max-w-full">
+                        
+                        <!-- 직관적 진료/휴무 달력 -->
+                        <div class="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-center mb-3">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base"><i class="fa-solid fa-calendar-day text-indigo-500"></i> 진료/휴무 설정</h3>
+                                    <p class="text-[9px] md:text-xs text-gray-500 mt-0.5 hidden md:block">날짜 클릭 시 휴무/정상 즉각 반영</p>
+                                </div>
+                                <div class="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
+                                    <button @click="prevMonth" class="px-2 md:px-3 py-1 hover:bg-white rounded text-gray-600 shadow-sm"><i class="fa-solid fa-chevron-left text-[9px] md:text-xs"></i></button>
+                                    <div class="px-3 md:px-4 font-black text-gray-800 text-[10px] md:text-sm" x-text="`${currentYear}년 ${currentMonth}월`"></div>
+                                    <button @click="nextMonth" class="px-2 md:px-3 py-1 hover:bg-white rounded text-gray-600 shadow-sm"><i class="fa-solid fa-chevron-right text-[9px] md:text-xs"></i></button>
+                                </div>
+                            </div>
+                            <!-- 높이를 줄인 달력 -->
+                            <div class="calendar-grid bg-gray-200 border border-gray-300 rounded-lg p-px overflow-hidden max-w-2xl mx-auto">
+                                <template x-for="day in ['일','월','화','수','목','금','토']" :key="'cal_header_'+day">
+                                    <div class="text-center font-bold text-[9px] md:text-xs py-1.5 bg-gray-100 text-gray-500" x-text="day"></div>
+                                </template>
+                                <template x-for="dateObj in calendarDays" :key="'cal_'+dateObj.id">
+                                    <div class="calendar-cell relative cursor-pointer hover:bg-blue-50 transition-colors" 
+                                         style="min-height: 40px;"
+                                         @click="if(dateObj.date) toggleHoliday(dateObj.dateStr, dateObj.dow)">
+                                        <template x-if="dateObj.date">
+                                            <div class="absolute inset-0 flex flex-col items-center justify-center m-0.5 md:m-1 rounded transition-all border"
+                                                 :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-100 text-gray-800 shadow-sm hover:border-blue-300'">
+                                                <span class="font-black text-[10px] md:text-sm leading-none" x-text="dateObj.date"></span>
+                                                <span class="text-[7px] md:text-[9px] font-bold mt-0.5 leading-none" x-text="isHoliday(dateObj.dateStr, dateObj.dow) ? '휴무' : '정상'"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- 전 직원 스케줄 편집기 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col relative">
+                            <div class="p-3 md:p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center z-30 shrink-0">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base"><i class="fa-solid fa-table text-blue-500"></i> 스케줄 편집기</h3>
+                                    <p class="text-[9px] md:text-xs text-gray-500 mt-0.5 hidden md:block">클릭 시 자동 반영됩니다.</p>
+                                </div>
+                                <button @click="exportToExcel('schedule')" class="px-2 py-1 md:px-3 md:py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[9px] md:text-xs font-bold hover:bg-blue-100 flex items-center gap-1.5 transition-colors shrink-0">
+                                    <i class="fa-solid fa-download"></i> 내보내기
+                                </button>
+                            </div>
+                            
+                            <div class="overflow-x-auto no-scrollbar relative w-full border-b border-gray-200">
+                                <table class="w-full text-center border-collapse text-[9px] md:text-sm min-w-max">
+                                    <thead class="bg-gray-100 text-gray-700 sticky top-0 z-40 shadow-sm">
+                                        <tr>
+                                            <th class="p-1 md:p-2 border-b border-r border-gray-300 font-bold sticky-col-1 w-12 md:w-16 thead-sticky-1 text-[9px] md:text-xs">직군</th>
+                                            <th class="p-1 md:p-2 border-b border-r border-gray-300 font-bold sticky-col-2 w-12 md:w-16 thead-sticky-2 text-[9px] md:text-xs">이름</th>
+                                            <template x-for="dateObj in calendarDays" :key="'thead_edit_'+dateObj.id">
+                                                <th class="p-0.5 md:p-1 border-b border-r border-gray-300 min-w-[28px] md:min-w-[40px]"
+                                                    :class="isHoliday(dateObj.dateStr, dateObj.dow) ? 'text-red-500 bg-red-50/50' : 'bg-gray-50'">
+                                                    <div class="text-[9px] md:text-sm" x-text="dateObj.date"></div>
+                                                </th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <template x-for="emp in data.employees" :key="'tr_edit_'+emp.id">
+                                            <tr class="hover:bg-blue-50/20 group transition-colors">
+                                                <td class="p-1 md:p-2 font-bold text-gray-500 bg-gray-50 border-r border-gray-300 sticky-col-1 text-[9px] md:text-xs" x-text="emp.group"></td>
+                                                <td class="p-1 md:p-2 font-black text-gray-800 bg-white border-r border-gray-300 sticky-col-2 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-blue-50/50 text-[10px] md:text-sm whitespace-nowrap" x-text="emp.name"></td>
+                                                
+                                                <template x-for="dateObj in calendarDays" :key="'td_edit_'+emp.id+'_'+dateObj.id">
+                                                    <td class="p-0 border-r border-gray-200 relative cursor-pointer hover:bg-gray-200 transition-colors"
+                                                        @click="toggleScheduleCell(emp.id, dateObj.dateStr)">
+                                                        <div class="w-full h-7 md:h-10 flex items-center justify-center font-bold text-[9px] md:text-xs"
+                                                             :class="getCellStyle(emp.id, dateObj.dateStr).textClass + ' ' + getCellStyle(emp.id, dateObj.dateStr).bgClass"
+                                                             x-text="getCellStyle(emp.id, dateObj.dateStr).text">
+                                                        </div>
+                                                    </td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="data.employees.length === 0">
+                                            <td :colspan="calendarDays.length + 2" class="p-8 text-gray-400 text-xs text-center">등록된 직원이 없습니다.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 범례 (하단 고정) -->
+                            <div class="p-2 md:p-3 bg-gray-50 flex flex-wrap gap-1.5 md:gap-2 text-[9px] md:text-xs items-center shrink-0">
+                                <span class="font-black text-gray-700 mr-1"><i class="fa-solid fa-tags text-gray-400"></i> 범례:</span>
+                                <template x-for="type in data.shiftTypes" :key="'legend_'+type.code">
+                                    <div class="flex items-center gap-1 bg-white px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-gray-200 shadow-sm" x-show="type.code !== ''">
+                                        <div class="w-3 h-3 md:w-4 md:h-4 rounded font-bold text-[8px] md:text-[9px] flex items-center justify-center" :class="type.color + ' ' + type.bgText" x-text="type.code"></div>
+                                        <span class="text-gray-600 font-medium whitespace-nowrap" x-text="type.name"></span>
+                                        <span class="text-[8px] md:text-[10px] text-red-400 ml-0.5 font-bold" x-show="type.deduction > 0" x-text="`(-${type.deduction})`"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function portalApp() {
+            return {
+                // UI States
+                currentView: 'gateway',
+                isAdminMode: false,
+                adminTab: 'schedule',
+                
+                // Calendar States
+                currentYear: new Date().getFullYear(),
+                currentMonth: new Date().getMonth() + 1,
+                calendarDays: [],
+                
+                // Filter & Form
+                selectedGroup: '전체',
+                newEmp: { group: '치과위생사', name: '', joinDate: new Date().toISOString().split('T')[0], usedLeaves: 0 },
+                
+                // Realtime visitor simulation - Adjusted base numbers
+                todayVisitors: Math.floor(Math.random() * 5) + 12,
+                totalVisitors: 142 + Math.floor(Math.random() * 10),
+                chartInstance: null,
+
+                // Admin Tabs Structure
+                adminTabs: [
+                    {id: 'schedule', name: '스케줄작성', icon: 'fa-calendar-days'},
+                    {id: 'emp', name: '직원관리', icon: 'fa-users'},
+                    {id: 'text', name: '텍스트관리', icon: 'fa-pen'},
+                    {id: 'stats', name: '조회/통계', icon: 'fa-chart-pie'}
+                ],
+
+                // Core Data Structure
+                data: {
+                    gatewayInfo: {
+                        welcomeTitle: "다인치과 임직원 여러분\n환영합니다.",
+                        welcomeSub: "다인치과의 비전과 사내 규정,\n스케줄 및 다양한 정보를 확인하세요.",
+                        latestUpdate: { text: "[공지] 노원다인치과병원 포털 마스터 오픈", date: new Date().toISOString().split('T')[0].replace(/-/g, '.') },
+                        menus: {
+                            info: { icon: 'fa-solid fa-hospital', title: '병원 소개', desc: '철학 및 인프라' },
+                            welfare: { icon: 'fa-solid fa-gift', title: '복리후생', desc: '직원 혜택 상세' },
+                            schedule: { icon: 'fa-solid fa-calendar-days', title: '직군별 스케줄', desc: '근무조/연차 현황' },
+                            qa: { icon: 'fa-solid fa-comments', title: 'Q&A 건의', desc: '직원 전용 질문게시판' }
+                        }
+                    },
+                    companyInfo: {
+                        title1: "환자를 최우선으로 생각하는\n노원다인치과병원",
+                        content1: "우리는 최고의 의료 서비스를 제공하기 위해 끊임없이 연구하고 노력합니다. \n최신 장비와 숙련된 의료진이 환자의 평생 치아 건강을 책임집니다.",
+                        title2: "우리의 핵심 가치",
+                        content2: "신뢰 (Trust): 정직한 진료로 환자의 믿음에 보답합니다.\n전문성 (Expertise): 끊임없는 학술 연구로 최상의 결과를 만듭니다.\n소통 (Communication): 환자의 소리에 귀 기울입니다."
+                    },
+                    employees: [
+                        { id: 'e1', group: '치과의사', name: '김원장', joinDate: '2020-03-01', usedLeaves: 0 },
+                        { id: 'e2', group: '치과위생사', name: '이수진', joinDate: '2023-01-15', usedLeaves: 2.5 },
+                        { id: 'e3', group: '코디네이터', name: '박민영', joinDate: '2024-05-10', usedLeaves: 1 }
+                    ],
+                    hospitalWorkingDays: [],
+                    hospitalHolidays: [],
+                    shiftTypes: [
+                        { code: '', name: '정상', color: 'bg-transparent', bgText: 'text-gray-800', deduction: 0 },
+                        { code: 'A', name: 'A조(09:30~18:30)', color: 'bg-blue-500', bgText: 'text-white', deduction: 0 },
+                        { code: 'B', name: 'B조(10:00~19:00)', color: 'bg-emerald-500', bgText: 'text-white', deduction: 0 },
+                        { code: 'O', name: '오프(휴무)', color: 'bg-rose-500', bgText: 'text-white', deduction: 1 },
+                        { code: 'H', name: '반차', color: 'bg-amber-500', bgText: 'text-white', deduction: 0.5 },
+                        { code: 'V', name: '연차', color: 'bg-purple-500', bgText: 'text-white', deduction: 1 }
+                    ],
+                    scheduleGrid: {}
+                },
+
+                // Computed Properties
+                get filteredEmployees() {
+                    if (this.selectedGroup === '전체') return this.data.employees;
+                    return this.data.employees.filter(e => e.group === this.selectedGroup);
+                },
+
+                // Initialization
+                init() {
+                    this.safeInitData();
+                    this.generateCalendar();
+                    
+                    // Improved Realtime visitor simulation
+                    setInterval(() => {
+                        // Less aggressive random increment
+                        if(Math.random() > 0.7) {
+                            this.todayVisitors++;
+                            this.totalVisitors++;
+                        }
+                    }, 5000); // Check every 5 seconds
+                },
+                
+                safeInitData() {
+                    if(!this.data.hospitalWorkingDays) this.data.hospitalWorkingDays = [];
+                    if(!this.data.hospitalHolidays) this.data.hospitalHolidays = [];
+                    if(!this.data.scheduleGrid) this.data.scheduleGrid = {};
+                },
+
+                // Navigation
+                changeView(view) {
+                    this.currentView = view;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+                getSubPageTitle() {
+                    const titles = { 'info': '병원 소개', 'welfare': '복리후생', 'schedule': '직군별 스케줄', 'qa': 'Q&A 건의' };
+                    return titles[this.currentView] || '';
+                },
+
+                // Admin Auth
+                adminLogin() {
+                    Swal.fire({
+                        title: '관리자 인증',
+                        input: 'password',
+                        inputPlaceholder: '비밀번호 (1234)',
+                        showCancelButton: true,
+                        confirmButtonText: '확인',
+                        cancelButtonText: '취소',
+                        confirmButtonColor: '#2563EB'
+                    }).then((result) => {
+                        if (result.value === '1234' || result.value === 'admin') {
+                            this.isAdminMode = true;
+                            this.adminTab = 'schedule';
+                            Swal.fire({icon: 'success', title: '인증 성공', showConfirmButton: false, timer: 1000});
+                        } else if (result.value) {
+                            Swal.fire({icon: 'error', title: '실패', text: '비밀번호 불일치'});
+                        }
+                    });
+                },
+                adminLogout() {
+                    this.isAdminMode = false;
+                    this.currentView = 'gateway';
+                },
+
+                // Calendar Generation
+                generateCalendar() {
+                    let firstDay = new Date(this.currentYear, this.currentMonth - 1, 1).getDay();
+                    let lastDate = new Date(this.currentYear, this.currentMonth, 0).getDate();
+                    let days = [];
+                    
+                    for (let i = 0; i < firstDay; i++) {
+                        days.push({ id: `pad_f_${i}`, date: '', dow: i, dateStr: null });
+                    }
+                    
+                    for (let i = 1; i <= lastDate; i++) {
+                        let dow = new Date(this.currentYear, this.currentMonth - 1, i).getDay();
+                        let dateStr = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                        days.push({ id: `date_${i}`, date: i, dow: dow, dateStr: dateStr });
+                    }
+                    
+                    let remaining = (7 - (days.length % 7)) % 7;
+                    for (let i = 0; i < remaining; i++) {
+                        let lastDow = days[days.length-1].dow;
+                        days.push({ id: `pad_b_${i}`, date: '', dow: (lastDow + 1) % 7, dateStr: null });
+                    }
+                    this.calendarDays = days;
+                },
+                prevMonth() {
+                    this.currentMonth--;
+                    if (this.currentMonth < 1) { this.currentMonth = 12; this.currentYear--; }
+                    this.generateCalendar();
+                },
+                nextMonth() {
+                    this.currentMonth++;
+                    if (this.currentMonth > 12) { this.currentMonth = 1; this.currentYear++; }
+                    this.generateCalendar();
+                },
+
+                // Holiday Logic
+                isHoliday(dateStr, dow) {
+                    if (!dateStr) return false;
+                    if (this.data.hospitalWorkingDays && this.data.hospitalWorkingDays.includes(dateStr)) return false;
+                    if (this.data.hospitalHolidays && this.data.hospitalHolidays.includes(dateStr)) return true;
+                    return dow === 0; // Sunday default
+                },
+                toggleHoliday(dateStr, dow) {
+                    if(!dateStr) return;
+                    let isDefaultOff = (dow === 0);
+                    
+                    if (isDefaultOff) {
+                        let idx = this.data.hospitalWorkingDays.indexOf(dateStr);
+                        if (idx > -1) this.data.hospitalWorkingDays.splice(idx, 1);
+                        else this.data.hospitalWorkingDays.push(dateStr);
+                    } else {
+                        let idx = this.data.hospitalHolidays.indexOf(dateStr);
+                        if (idx > -1) this.data.hospitalHolidays.splice(idx, 1);
+                        else this.data.hospitalHolidays.push(dateStr);
+                    }
+                    this.triggerUpdateNotification('진료일정');
+                },
+
+                // Employee Logic
+                addEmployee() {
+                    if(!this.newEmp.name || !this.newEmp.joinDate) {
+                        Swal.fire('오류', '이름/입사일 필수', 'error');
+                        return;
+                    }
+                    this.data.employees.push({
+                        id: 'e_' + Date.now(),
+                        group: this.newEmp.group,
+                        name: this.newEmp.name,
+                        joinDate: this.newEmp.joinDate,
+                        usedLeaves: parseFloat(this.newEmp.usedLeaves) || 0
+                    });
+                    this.newEmp.name = ''; this.newEmp.usedLeaves = 0;
+                    Swal.fire({icon: 'success', title: '등록 완료', timer: 1000, showConfirmButton: false});
+                    this.triggerUpdateNotification('직원명단');
+                },
+                removeEmployee(id) {
+                    Swal.fire({
+                        title: '직원 삭제', text: "정말 삭제합니까?", icon: 'warning',
+                        showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: '삭제'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            this.data.employees = this.data.employees.filter(e => e.id !== id);
+                            Swal.fire({icon: 'success', title: '삭제됨', showConfirmButton: false, timer: 1000});
+                        }
+                    });
+                },
+
+                // Leave Calc
+                calculateTotalLeaves(emp) {
+                    let joinYear = parseInt(emp.joinDate.split('-')[0]);
+                    let currentY = new Date().getFullYear();
+                    return (currentY - joinYear < 1) ? 11 : 15;
+                },
+                calculateRemainingLeaves(emp) {
+                    let total = this.calculateTotalLeaves(emp);
+                    let used = emp.usedLeaves;
+                    let todayStr = new Date().toISOString().split('T')[0];
+                    
+                    if (this.data.scheduleGrid) {
+                        Object.values(this.data.scheduleGrid).forEach(monthData => {
+                            if (monthData && monthData[emp.id]) {
+                                Object.entries(monthData[emp.id]).forEach(([dateStr, code]) => {
+                                    if (dateStr <= todayStr) {
+                                        let type = this.data.shiftTypes.find(t => t.code === code);
+                                        if (type) used += type.deduction;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    return (total - used).toFixed(1);
+                },
+
+                // Schedule Logic
+                toggleScheduleCell(empId, dateStr) {
+                    if(!dateStr) return;
+                    let ym = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}`;
+                    
+                    if(!this.data.scheduleGrid[ym]) this.data.scheduleGrid[ym] = {};
+                    if(!this.data.scheduleGrid[ym][empId]) this.data.scheduleGrid[ym][empId] = {};
+                    
+                    let currentCode = this.data.scheduleGrid[ym][empId][dateStr] || '';
+                    let codes = this.data.shiftTypes.map(t => t.code);
+                    let nextIdx = (codes.indexOf(currentCode) + 1) % codes.length;
+                    
+                    this.data.scheduleGrid[ym][empId][dateStr] = codes[nextIdx];
+                    this.triggerUpdateNotification('스케줄');
+                },
+                getCellStyle(empId, dateStr) {
+                    if(!dateStr) return { text: '', bgClass: '', textClass: '' };
+                    let ym = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}`;
+                    
+                    let code = '';
+                    if (this.data.scheduleGrid[ym] && this.data.scheduleGrid[ym][empId]) {
+                        code = this.data.scheduleGrid[ym][empId][dateStr] || '';
+                    }
+                    
+                    let type = this.data.shiftTypes.find(t => t.code === code);
+                    if (type && type.code !== '') return { text: type.code, bgClass: type.color, textClass: type.bgText };
+                    return { text: '', bgClass: '', textClass: '' };
+                },
+
+                // Notifications
+                triggerUpdateNotification(type) {
+                    let dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+                    this.data.gatewayInfo.latestUpdate = { text: `[업데이트] ${type} 정보가 변경되었습니다.`, date: dateStr };
+                },
+                saveAllDataAndNotify() {
+                    let msg = "[공지] 시스템 업데이트 완료";
+                    if (this.adminTab === 'text') msg = "[공지] 메인 텍스트 및 병원 소개 내용 변경";
+                    if (this.adminTab === 'emp') msg = "[공지] 직원 명단 최신화";
+                    if (this.adminTab === 'schedule') msg = `[공지] ${this.currentMonth}월 스케줄 반영`;
+                    
+                    this.data.gatewayInfo.latestUpdate = {
+                        text: msg, date: new Date().toISOString().split('T')[0].replace(/-/g, '.')
+                    };
+                    Swal.fire({ icon: 'success', title: '저장 완료', text: '서버에 반영되었습니다.', confirmButtonColor: '#2563EB' });
+                },
+
+                // Export
+                exportToExcel(type) {
+                    try {
+                        let wb = XLSX.utils.book_new();
+                        let fileName = '';
+                        
+                        if (type === 'emp') {
+                            let exportData = this.data.employees.map((emp, i) => {
+                                let total = this.calculateTotalLeaves(emp);
+                                let remain = parseFloat(this.calculateRemainingLeaves(emp));
+                                return {
+                                    "No": i + 1, "직군": emp.group, "이름": emp.name, "입사일": emp.joinDate,
+                                    "총 발생": total, "사용": (total - remain).toFixed(1), "잔여": remain.toFixed(1)
+                                };
+                            });
+                            let ws = XLSX.utils.json_to_sheet(exportData);
+                            XLSX.utils.book_append_sheet(wb, ws, "연차현황");
+                            fileName = `다인치과_연차현황_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        } else if (type === 'schedule') {
+                            let ym = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}`;
+                            let actualDays = this.calendarDays.filter(d => d.date);
+                            let header = ["직군", "이름", ...actualDays.map(d => `${d.date}일`)];
+                            
+                            let exportData = [header];
+                            this.data.employees.forEach(emp => {
+                                let row = [emp.group, emp.name];
+                                actualDays.forEach(d => {
+                                    let code = (this.data.scheduleGrid[ym] && this.data.scheduleGrid[ym][emp.id]) ? this.data.scheduleGrid[ym][emp.id][d.dateStr] || '' : '';
+                                    row.push(code || '정상');
+                                });
+                                exportData.push(row);
+                            });
+                            let ws = XLSX.utils.aoa_to_sheet(exportData);
+                            XLSX.utils.book_append_sheet(wb, ws, `${this.currentMonth}월스케줄`);
+                            fileName = `다인치과_${this.currentMonth}월_스케줄.xlsx`;
+                        }
+                        XLSX.writeFile(wb, fileName);
+                    } catch (e) {
+                        Swal.fire('오류', '다운로드 실패', 'error');
+                    }
+                },
+
+                // Chart rendering for stats
+                renderChart() {
+                    const ctx = document.getElementById('visitorChart');
+                    if (!ctx) return;
+                    
+                    if (this.chartInstance) {
+                        this.chartInstance.destroy();
+                    }
+
+                    // Dummy data for last 7 days
+                    const labels = [];
+                    const data = [];
+                    for(let i=6; i>=0; i--) {
+                        let d = new Date();
+                        d.setDate(d.getDate() - i);
+                        labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+                        if(i===0) data.push(this.todayVisitors);
+                        else data.push(Math.floor(Math.random() * 50) + 100);
+                    }
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '일일 방문자 수',
+                                data: data,
+                                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                                borderColor: 'rgb(59, 130, 246)',
+                                borderWidth: 1,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
