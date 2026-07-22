@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>노원다인치과병원 포털</title>
+    
+    <!-- CSS & Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; color: #1e293b; overflow-x: hidden; }
+        [x-cloak] { display: none !important; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @media print {
+            @page { size: landscape; margin: 10mm; }
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-hide { display: none !important; }
+            .print-only { display: block !important; }
+            .print-container { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; overflow: visible !important; zoom: 0.9; }
+            .table-wrapper { overflow: visible !important; max-height: none !important; height: auto !important; }
+            table { width: 100% !important; table-layout: fixed !important; page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            td, th { overflow: visible !important; white-space: nowrap !important; }
+        }
+        
+        /* 모바일 스케줄 스크롤 고정 및 31일 레이아웃 최적화 (기존 코드 완벽 보존) */
+        .admin-compact td, .admin-compact th { padding: 3px 5px; font-size: 11.5px; }
+        .table-wrapper { overflow-x: auto; overflow-y: auto; position: relative; max-width: 100%; max-height: 55vh; }
+        .sticky-col { position: sticky !important; z-index: 10; background-color: #ffffff; }
+        thead .sticky-col { z-index: 30 !important; background-color: #f8fafc; }
+        
+        .truncate-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+
+        /* 상태 펄스 애니메이션 */
+        @keyframes pulse-status {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .status-pulse { animation: pulse-status 2s infinite; }
+        @keyframes pulse-error {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .status-error { animation: pulse-error 2s infinite; }
+    </style>
+</head>
+<body x-data="portalApp()" x-init="init()" class="antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- [1. 관리자 모드] -->
+    <main class="flex-grow flex flex-col h-full bg-[#f8fafc] relative z-50 print-hide" x-show="isAdminMode" x-cloak>
+        <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shrink-0 shadow-md z-30 h-14">
+            <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-full bg-blue-600 flex-center shadow-inner"><i class="fa-solid fa-wrench text-[13px]"></i></div>
+                <h2 class="font-black text-[15px] sm:text-[16px] tracking-tight hidden sm:block">포털 통합 관리시스템</h2>
+                <h2 class="font-black text-[15px] tracking-tight sm:hidden">관리시스템</h2>
+            </div>
+            <div class="flex gap-2">
+                <button @click="saveData()" class="px-3 sm:px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-[12.5px] font-bold shadow-sm transition-colors flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i> <span class="hidden sm:inline">전체 저장</span><span class="sm:hidden">저장</span>
+                </button>
+                <button @click="adminLogout" class="px-3 sm:px-4 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-[12.5px] font-bold shadow-sm transition-colors">나가기</button>
+            </div>
+        </div>
+
+        <div class="flex flex-1 overflow-hidden h-[calc(100vh-3.5rem)]">
+            <div class="w-16 sm:w-48 bg-white border-r border-gray-200 shadow-[2px_0_8px_rgba(0,0,0,0.02)] flex flex-col py-3 shrink-0 z-20 overflow-y-auto hide-scrollbar">
+                <template x-for="tab in adminTabs" :key="tab.id">
+                    <button @click="adminTab = tab.id" 
+                            class="text-left sm:px-4 py-3 sm:py-3.5 text-[12px] sm:text-[13px] font-bold transition-all relative flex items-center justify-center sm:justify-start gap-3"
+                            :class="adminTab === tab.id ? 'text-blue-700 bg-blue-50/50' : 'text-gray-600 hover:bg-gray-50'"
+                            :title="tab.name">
+                        <i :class="tab.icon" class="w-4 text-center text-[15px] sm:text-[14px]" :class="adminTab === tab.id ? 'text-blue-600' : 'text-gray-400'"></i>
+                        <span class="hidden sm:inline" x-text="tab.name"></span>
+                        <div x-show="adminTab === tab.id" class="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-md shadow-[1px_0_4px_rgba(37,99,235,0.4)]"></div>
+                    </button>
+                </template>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-2 sm:p-4 relative hide-scrollbar">
+                
+                <!-- 1-1. 스케줄 에디터 -->
+                <template x-if="adminTab === 'schedule_edit'">
+                    <div class="space-y-3 max-w-[1400px] w-full mx-auto flex flex-col h-full pb-4 px-1">
+                        <div class="bg-blue-50/50 border border-blue-200 rounded-xl p-3 flex items-start gap-2.5 shadow-sm shrink-0">
+                            <i class="fa-solid fa-circle-info text-blue-500 mt-0.5 text-[14px]"></i>
+                            <div class="w-full">
+                                <h4 class="font-bold text-blue-800 text-[13.5px] mb-1">통합 스케줄 편집기</h4>
+                                <p class="text-[12px] text-blue-600 leading-snug mb-2 break-keep">모든 직군의 스케줄을 한눈에 확인하고 클릭만으로 빠르게 수정할 수 있습니다.<br>※ 달력 관리에서 지정한 <strong class="text-red-500">휴무일(목/일 등)은 자동으로 빨간색 '휴무'로 표기</strong>되므로 별도로 입력하지 않으셔도 됩니다.</p>
+                                <div class="flex flex-wrap gap-1.5 pt-2 border-t border-blue-200/50 items-center">
+                                    <span class="text-[11.5px] font-bold text-blue-800 mr-1"><i class="fa-solid fa-tags text-blue-500 mr-1"></i> 현재 등록된 범례:</span>
+                                    <template x-for="type in (data.shiftTypes || []).filter(t => t.code !== '' && t.code !== '정상')" :key="'leg_show_'+type.code">
+                                        <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-black/5" :class="type.color + ' ' + type.bgText" x-text="type.code + (type.label ? `(${type.label})` : '')"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 min-h-[400px] overflow-hidden admin-compact relative">
+                            <div class="p-2.5 border-b border-gray-100 flex items-center justify-between bg-gray-50 shrink-0 z-20 flex-wrap gap-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex gap-1 bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <button @click="changeMonth(-1)" class="w-7 h-7 hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-left text-[11px]"></i></button>
+                                        <div class="w-20 flex-center font-black text-[13px] text-gray-800 border-x border-gray-100" x-text="`${currentYear}년 ${currentMonth}월`"></div>
+                                        <button @click="changeMonth(1)" class="w-7 h-7 hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-right text-[11px]"></i></button>
+                                    </div>
+                                    <select x-model="selectedGroup" class="bg-white border border-gray-300 text-gray-700 text-[12px] rounded-lg focus:ring-blue-500 px-3 py-1.5 font-bold shadow-sm outline-none cursor-pointer">
+                                        <option value="전체">전체 직군 보기</option>
+                                        <template x-for="g in (data.groups || [])" :key="g"><option :value="g" x-text="g"></option></template>
+                                    </select>
+                                </div>
+                                <button @click="downloadExcel('schedule')" class="px-3 py-1.5 text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 flex items-center gap-1.5 shadow-sm transition-colors hidden sm:flex"><i class="fa-solid fa-file-excel"></i> 엑셀 백업</button>
+                            </div>
+
+                            <div class="table-wrapper flex-1 p-0 hide-scrollbar rounded-b-xl relative bg-white border-b border-gray-400">
+                                <table class="w-full text-center border-collapse table-fixed min-w-max border-r border-gray-400">
+                                    <thead class="bg-gray-100 sticky top-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
+                                        <tr>
+                                            <th class="w-[26px] md:w-[30px] min-w-[26px] md:min-w-[30px] border-b border-r border-gray-400 text-gray-700 font-bold sticky left-0 sticky-col bg-gray-100 shadow-[1px_0_0_#94a3b8] text-[10px] md:text-[11px] py-2">No.</th>
+                                            <th class="w-[55px] md:w-[65px] min-w-[55px] md:min-w-[65px] border-b border-r border-gray-400 text-gray-700 font-bold sticky left-[26px] md:left-[30px] sticky-col bg-gray-100 shadow-[1px_0_0_#94a3b8] whitespace-nowrap text-[11px] md:text-[12px] py-2">직군</th>
+                                            <th class="w-[50px] md:w-[55px] min-w-[50px] md:min-w-[55px] border-b border-r border-gray-400 text-gray-700 font-bold sticky left-[81px] md:left-[95px] sticky-col bg-gray-100 shadow-[2px_0_0_#94a3b8] whitespace-nowrap text-[11px] md:text-[12px] py-2">이름</th>
+                                            <template x-for="dateObj in calendarDays.filter(d => d.dateStr !== null)" :key="'adm_th_'+dateObj.id">
+                                                <th class="w-[24px] md:w-[26px] lg:w-[28px] xl:w-[31px] min-w-[24px] md:min-w-[26px] lg:min-w-[28px] xl:min-w-[31px] border-b border-r border-gray-400 py-1" :class="isHoliday(dateObj.dateStr) ? 'bg-red-50/50' : ''">
+                                                    <div class="text-[9px] md:text-[11px] font-black leading-none" :class="dateObj.isSun ? 'text-red-600' : (dateObj.isSat ? 'text-blue-600' : 'text-gray-800')" x-text="dateObj.day"></div>
+                                                    <div class="text-[8px] md:text-[9px] text-gray-600 font-medium mt-0.5" x-text="dateObj.dayName"></div>
+                                                </th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(emp, index) in filteredEmployees" :key="'adm_emp_'+emp.id">
+                                            <tr class="hover:bg-blue-50/30 transition-colors border-b border-gray-300">
+                                                <td class="border-r border-gray-400 text-[10px] md:text-[11px] font-bold text-gray-500 sticky left-0 sticky-col bg-white shadow-[1px_0_0_#94a3b8] text-center py-2" x-text="index + 1"></td>
+                                                <td class="border-r border-gray-400 text-[11px] md:text-[11.5px] font-medium text-gray-700 sticky left-[26px] md:left-[30px] sticky-col bg-white shadow-[1px_0_0_#94a3b8] whitespace-nowrap py-2" x-text="emp.group"></td>
+                                                <td class="font-black text-[11.5px] md:text-[12px] text-gray-800 border-r border-gray-400 sticky left-[81px] md:left-[95px] sticky-col bg-white shadow-[2px_0_0_#94a3b8] whitespace-nowrap py-2" x-text="emp.name"></td>
+                                                
+                                                <template x-for="dateObj in calendarDays.filter(d => d.dateStr !== null)" :key="'adm_td_'+emp.id+'_'+dateObj.id">
+                                                    <td class="cursor-pointer hover:opacity-80 transition-opacity p-0 select-none relative h-[30px] md:h-[36px] w-[24px] md:w-[26px] lg:w-[28px] xl:w-[31px] max-w-[31px] border-r border-gray-300 overflow-hidden"
+                                                        :class="isHoliday(dateObj.dateStr) ? 'bg-red-50/20' : (getCellStyle(emp.id, dateObj.dateStr).bgClass)"
+                                                        @click="!isHoliday(dateObj.dateStr) && toggleScheduleCell(emp.id, dateObj.dateStr)">
+                                                        <div class="w-full h-full flex-center overflow-hidden px-0 tracking-tighter">
+                                                            <span class="text-[8.5px] md:text-[10px] lg:text-[11px] font-bold block w-full text-center truncate-text" 
+                                                                  :class="isHoliday(dateObj.dateStr) ? 'text-red-600' : getCellStyle(emp.id, dateObj.dateStr).textClass"
+                                                                  x-text="isHoliday(dateObj.dateStr) ? '휴무' : getCellStyle(emp.id, dateObj.dateStr).text"></span>
+                                                        </div>
+                                                    </td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                        <template x-if="filteredEmployees.length === 0">
+                                            <tr><td :colspan="calendarDays.filter(d => d.dateStr !== null).length + 3" class="py-8 text-gray-400 text-[12px] font-medium border-b border-gray-200">등록된 직원이 없습니다.</td></tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-2. 범례 및 달력 휴무 관리 -->
+                <template x-if="adminTab === 'legend'">
+                    <div class="space-y-4 max-w-5xl mx-auto pb-6">
+                        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[14px] mb-4 flex items-center gap-2"><i class="fa-solid fa-palette text-blue-500"></i> 스케줄 범례 커스텀 (한글 코드 가능)</h3>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <template x-for="(type, idx) in (data.shiftTypes || [])" :key="'leg_'+idx">
+                                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors w-full">
+                                        <input type="text" x-model="type.code" placeholder="코드" class="w-14 px-2 py-1.5 text-[12px] border rounded-lg text-center font-bold focus:ring-1 focus:ring-blue-500 bg-white shadow-sm z-10 shrink-0 outline-none">
+                                        <input type="text" x-model="type.label" placeholder="상세설명" class="flex-1 min-w-[80px] px-2.5 py-1.5 text-[12px] border rounded-lg font-medium focus:ring-1 focus:ring-blue-500 bg-white shadow-sm z-10 outline-none">
+                                        <select x-model="type.color" class="w-24 px-2 py-1.5 text-[12px] border rounded-lg focus:ring-1 focus:ring-blue-500 bg-white shadow-sm z-10 font-bold shrink-0 outline-none cursor-pointer">
+                                            <option value="bg-transparent">투명(흰색)</option>
+                                            <option value="bg-blue-500">파랑</option><option value="bg-emerald-500">초록</option>
+                                            <option value="bg-indigo-500">남색</option><option value="bg-purple-500">보라</option>
+                                            <option value="bg-amber-400">노랑</option><option value="bg-rose-500">빨강</option>
+                                            <option value="bg-slate-700">검정</option><option value="bg-cyan-500">하늘</option>
+                                            <option value="bg-pink-500">핑크</option>
+                                        </select>
+                                        <select x-model="type.bgText" class="w-20 px-2 py-1.5 text-[12px] border rounded-lg focus:ring-1 focus:ring-blue-500 bg-white shadow-sm z-10 font-bold shrink-0 outline-none cursor-pointer">
+                                            <option value="text-white">흰글씨</option>
+                                            <option value="text-gray-800">검은글씨</option>
+                                        </select>
+                                        <div class="flex items-center bg-white border border-gray-200 rounded-lg px-2 py-1.5 w-[75px] shadow-sm z-10 shrink-0">
+                                            <span class="text-[10.5px] text-gray-500 font-bold mr-1.5 whitespace-nowrap">연차<br>차감</span>
+                                            <input type="number" step="0.5" min="0" x-model="type.deduction" class="w-full text-[12px] text-center font-black text-red-500 outline-none bg-transparent">
+                                        </div>
+                                        <button @click="data.shiftTypes.splice(idx, 1); saveData('legend');" class="w-8 h-8 flex-center text-red-400 hover:text-white hover:bg-red-500 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors shrink-0 z-10"><i class="fa-solid fa-trash-can text-[12px]"></i></button>
+                                        <div class="absolute left-0 top-0 bottom-0 w-1.5 z-0" :class="type.color"></div>
+                                    </div>
+                                </template>
+                                <button @click="data.shiftTypes.push({code:'', label:'', color:'bg-transparent', bgText:'text-gray-800', deduction: 0}); saveData('legend');" class="border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-[12px] font-bold hover:bg-gray-50 transition-colors p-3 flex-center gap-2 min-h-[52px]"><i class="fa-solid fa-plus"></i> 범례 추가</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[14px] mb-4 flex items-center gap-2"><i class="fa-regular fa-calendar-xmark text-red-500"></i> 메인 달력 휴무일 관리 (클릭 시 토글)</h3>
+                            <div class="mb-4 flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200 flex-wrap shadow-sm">
+                                <span class="text-[12px] font-bold text-gray-700 whitespace-nowrap">기본 휴무 세팅:</span>
+                                <div class="flex gap-2.5 flex-wrap">
+                                    <template x-for="(dayName, idx) in ['일','월','화','수','목','금','토']" :key="'def_hol_'+idx">
+                                        <label class="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1.5 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors">
+                                            <input type="checkbox" :value="idx.toString()" x-model="data.defaultHolidays" @change="saveData('legend')" class="w-3.5 h-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+                                            <span class="text-[11.5px] font-bold" :class="idx===0 ? 'text-red-500' : (idx===6 ? 'text-blue-500' : 'text-gray-700')" x-text="dayName + '요일'"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                                <span class="text-[11px] text-gray-400 ml-auto hidden md:block">(체크 시 해당 요일은 매월 기본 휴무)</span>
+                            </div>
+
+                            <div class="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm max-w-3xl">
+                                <div class="bg-gray-50 p-2.5 border-b border-gray-200 flex items-center justify-between">
+                                    <div class="font-black text-blue-800 text-[13px] pl-2" x-text="`${currentYear}년 ${currentMonth}월 상세 세팅`"></div>
+                                    <div class="flex gap-1 bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <button @click="changeMonth(-1)" class="w-7 h-7 rounded-l hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-left text-[11px]"></i></button>
+                                        <button @click="changeMonth(1)" class="w-7 h-7 rounded-r border-l border-gray-200 hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-right text-[11px]"></i></button>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-7 text-center">
+                                    <template x-for="(day, idx) in ['일','월','화','수','목','금','토']" :key="'cal_hh_'+idx">
+                                        <div class="py-2 font-bold text-[12px] border-b border-r border-gray-100 bg-gray-50" :class="idx===0 ? 'text-red-500' : (idx===6 ? 'text-blue-500' : 'text-gray-700')" x-text="day"></div>
+                                    </template>
+                                    <template x-for="dateObj in calendarDays" :key="'cal_dd_'+dateObj.id">
+                                        <div class="h-[50px] p-1 border-b border-r border-gray-100 flex flex-col items-center justify-center cursor-pointer transition-colors"
+                                             :class="!dateObj.dateStr ? 'bg-gray-50/20' : (isHoliday(dateObj.dateStr) ? 'bg-red-50/20 hover:bg-red-50' : 'bg-white hover:bg-gray-50')"
+                                             @click="dateObj.dateStr && toggleHoliday(dateObj.dateStr)">
+                                            <template x-if="dateObj.dateStr">
+                                                <div class="w-full flex flex-col items-center">
+                                                    <span class="text-[13px] font-black" :class="isHoliday(dateObj.dateStr) ? 'text-red-500' : (dateObj.isSun ? 'text-red-500' : (dateObj.isSat ? 'text-blue-500' : 'text-gray-800'))" x-text="dateObj.day"></span>
+                                                    <span class="text-[10px] font-bold mt-0.5 px-1.5 py-0.5 rounded" :class="isHoliday(dateObj.dateStr) ? 'bg-red-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'" x-text="isHoliday(dateObj.dateStr) ? '휴무' : '정상'"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-3. 직원/연차 관리 (직군 연쇄 수정 및 개별 수정 완벽 지원) -->
+                <template x-if="adminTab === 'emp'">
+                    <div class="space-y-4 max-w-6xl mx-auto flex flex-col h-full pb-4">
+                        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 shrink-0">
+                            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                                <h3 class="font-black text-gray-800 text-[14px] flex items-center gap-2"><i class="fa-solid fa-users text-green-500"></i> 직원 및 연차 통합 관리</h3>
+                                <div class="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner">
+                                    <button @click="data.leaveStandard = 'join'; saveData('emp')" class="px-4 py-1.5 text-[11.5px] font-bold rounded-md transition-all" :class="data.leaveStandard === 'join' ? 'bg-white text-blue-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'">입사일 기준 일괄 적용</button>
+                                    <button @click="data.leaveStandard = 'fiscal'; saveData('emp')" class="px-4 py-1.5 text-[11.5px] font-bold rounded-md transition-all" :class="data.leaveStandard === 'fiscal' ? 'bg-white text-blue-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'">회계연도 기준 일괄 적용</button>
+                                </div>
+                            </div>
+
+                            <!-- 직군 일괄 수정 영역 (이름 변경 시 직원 명단에도 자동 반영) -->
+                            <div class="flex items-center gap-2.5 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200 flex-wrap shadow-sm">
+                                <span class="text-[12px] font-bold text-gray-600 min-w-max mr-1">직군 리스트 (클릭하여 일괄 수정):</span>
+                                <template x-for="(g, idx) in (data.groups || [])" :key="'g_edit_'+idx">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-[11px] font-bold text-gray-700 shadow-sm group">
+                                        <!-- 직군 이름을 직접 수정하면 renameGroup 함수가 호출되어 연쇄 변경됨 -->
+                                        <input type="text" :value="g" @change="renameGroup(g, $event.target.value, idx)" class="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-16 text-center focus:w-20 transition-all font-bold text-gray-700 cursor-text">
+                                        <button @click="data.groups.splice(idx,1); saveData('emp');" class="text-red-400 hover:text-red-600 ml-1 opacity-50 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-xmark"></i></button>
+                                    </span>
+                                </template>
+                                <div class="flex items-center ml-2 shadow-sm rounded-lg overflow-hidden border border-gray-300">
+                                    <input type="text" x-model="newGroup" placeholder="새 직군" class="w-24 px-3 py-1.5 text-[11.5px] focus:ring-1 focus:ring-blue-500 outline-none bg-white" @keydown.enter="addGroup">
+                                    <button @click="addGroup" class="px-3 py-1.5 bg-slate-700 text-white text-[11.5px] font-bold hover:bg-slate-800 transition-colors">추가</button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-2.5 items-center bg-green-50/50 p-3.5 rounded-xl border border-green-200 shadow-sm flex-wrap">
+                                <span class="text-[12px] font-black text-green-800 mr-2"><i class="fa-solid fa-user-plus mr-1"></i> 신규직원 등록:</span>
+                                <select x-model="newEmp.group" class="w-28 px-3 py-2 text-[12px] border rounded-lg focus:ring-1 focus:ring-green-500 font-bold bg-white outline-none cursor-pointer">
+                                    <option value="">직군선택</option>
+                                    <template x-for="g in (data.groups || [])" :key="'g_sel_'+g"><option :value="g" x-text="g"></option></template>
+                                </select>
+                                <input type="text" x-model="newEmp.name" placeholder="이름" class="w-24 px-3 py-2 text-[12px] border rounded-lg focus:ring-1 focus:ring-green-500 font-bold bg-white outline-none" @keydown.enter="addEmployee">
+                                <input type="date" x-model="newEmp.joinDate" class="w-32 px-3 py-2 text-[11.5px] border rounded-lg focus:ring-1 focus:ring-green-500 font-bold text-gray-700 bg-white outline-none cursor-pointer">
+                                <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 ml-auto shadow-sm">
+                                    <span class="text-[11px] font-bold text-gray-500 cursor-help" title="올해 기사용 연차 강제 차감">과거사용 차감:</span>
+                                    <input type="number" step="0.5" x-model="newEmp.usedLeaves" placeholder="0" class="w-12 text-[12px] text-center font-black outline-none text-red-500 bg-transparent">
+                                </div>
+                                <button @click="addEmployee" class="px-5 py-2 bg-green-600 text-white text-[12px] font-bold rounded-lg hover:bg-green-700 shadow-sm transition-colors">명단 등록</button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden min-h-[300px]">
+                            <div class="p-2.5 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
+                                <h4 class="font-black text-gray-800 text-[13px] pl-2">직원 명단 및 잔여 연차 실시간 현황 (오늘 기준)</h4>
+                                <button @click="downloadExcel('emp')" class="px-3 py-1.5 text-[11.5px] font-bold bg-white text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 flex items-center gap-1.5 shadow-sm transition-colors"><i class="fa-solid fa-file-excel"></i> 명단 엑셀다운</button>
+                            </div>
+                            <div class="overflow-y-auto flex-1 p-0 hide-scrollbar relative bg-white admin-compact">
+                                <table class="w-full text-center border-collapse table-fixed min-w-[700px]">
+                                    <thead class="bg-gray-50 sticky top-0 z-10 border-b border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                                        <tr>
+                                            <th class="py-2.5 text-[11.5px] text-gray-500 font-bold w-12 border-r border-gray-100">No.</th>
+                                            <th class="py-2.5 text-[11.5px] text-blue-600 font-bold border-r border-gray-100">직군(클릭 시 수정)</th>
+                                            <th class="py-2.5 text-[11.5px] text-blue-600 font-bold border-r border-gray-100">이름(클릭 시 수정)</th>
+                                            <th class="py-2.5 text-[11.5px] text-gray-500 font-bold w-[140px] border-r border-gray-100">입사일</th>
+                                            <th class="py-2.5 text-[11.5px] text-blue-600 font-bold w-[80px] bg-blue-50/30 border-r border-gray-100">총 발생</th>
+                                            <th class="py-2.5 text-[11.5px] text-red-600 font-bold w-[80px] bg-red-50/30 border-r border-gray-100">총 사용</th>
+                                            <th class="py-2.5 text-[12px] text-green-700 font-black w-[100px] bg-green-50/50 border-r border-gray-100">잔여연차</th>
+                                            <th class="py-2.5 text-[11.5px] text-gray-500 font-bold w-16">관리</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(emp, index) in (data.employees || [])" :key="'emp_m_'+emp.id">
+                                            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors group">
+                                                <td class="py-2 text-[11.5px] text-gray-400 font-bold border-r border-gray-100" x-text="index + 1"></td>
+                                                <!-- 직군 개별 인라인 수정 (Select Box) -->
+                                                <td class="py-1 px-2 border-r border-gray-100 relative">
+                                                    <select x-model="emp.group" @change="saveData('emp')" class="w-full text-[12px] font-bold text-gray-600 bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 outline-none text-center cursor-pointer hover:bg-white transition-colors">
+                                                        <template x-for="g in (data.groups || [])" :key="'s_g_'+g">
+                                                            <option :value="g" x-text="g"></option>
+                                                        </template>
+                                                    </select>
+                                                </td>
+                                                <!-- 이름 개별 인라인 수정 (Input Box) -->
+                                                <td class="py-1 px-2 border-r border-gray-100">
+                                                    <input type="text" x-model="emp.name" @blur="saveData('emp')" @keydown.enter="saveData('emp')" class="w-full text-[12.5px] font-black text-gray-800 bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 outline-none text-center cursor-text hover:bg-white transition-colors">
+                                                </td>
+                                                <td class="py-2 border-r border-gray-100">
+                                                    <input type="date" x-model="emp.joinDate" @change="saveData('emp')" class="text-[11.5px] px-2 py-1 border rounded-lg border-gray-300 text-gray-600 font-bold text-center w-[120px] bg-white outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer">
+                                                </td>
+                                                <td class="py-2 text-[12.5px] font-bold text-blue-600 border-r border-gray-100" x-text="calculateTotalLeaves(emp.joinDate)"></td>
+                                                <td class="py-2 text-[12.5px] font-bold text-red-500 border-r border-gray-100" x-text="calculateUsed(emp)"></td>
+                                                <td class="py-2 text-[13.5px] font-black text-green-600 bg-green-50/10 border-r border-gray-100" x-text="getRemainLeaves(emp)"></td>
+                                                <td class="py-2">
+                                                    <button @click="removeEmployee(emp.id)" class="text-red-400 hover:text-white hover:bg-red-500 bg-red-50 w-7 h-7 rounded-lg flex-center mx-auto transition-colors border border-red-100 shadow-sm opacity-50 group-hover:opacity-100"><i class="fa-solid fa-trash-can text-[11px]"></i></button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <template x-if="!(data.employees && data.employees.length > 0)">
+                                            <tr><td colspan="8" class="py-12 text-center text-[12px] text-gray-400 font-medium">등록된 직원이 없습니다.</td></tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-4. 게이트웨이 메인 텍스트 및 외부 링크 -->
+                <template x-if="adminTab === 'content'">
+                    <div class="space-y-4 max-w-4xl mx-auto pb-6">
+                        <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[15px] mb-5 flex items-center gap-2"><i class="fa-solid fa-link text-indigo-500"></i> 게이트웨이 메인 텍스트 및 외부 링크 설정</h3>
+                            
+                            <!-- ★ 신규 추가: 포털 공식 로고 관리자 직접 업로드 기능 -->
+                            <div class="bg-blue-50/80 p-5 rounded-xl border border-blue-200 mb-5 shadow-sm">
+                                <label class="block text-[13px] font-black text-blue-900 mb-3"><i class="fa-solid fa-image text-blue-600 mr-1.5"></i> 포털 공식 로고 등록 (메인 화면 및 병원 소개 자동 적용)</label>
+                                <div class="flex flex-col sm:flex-row gap-3 items-center w-full">
+                                    <input type="file" accept="image/*" @change="uploadLogo($event)" class="w-full sm:flex-1 text-[12px] text-gray-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer bg-white border border-gray-300 rounded-lg p-1.5 outline-none shadow-sm transition-colors">
+                                    <button @click="data.logoUrl = ''; saveData('content'); Swal.fire('초기화', '로고가 기본 텍스트 디자인으로 변경되었습니다.', 'success');" class="w-full sm:w-auto px-5 py-2.5 bg-white text-red-500 border border-red-200 text-[12.5px] font-bold rounded-lg hover:bg-red-50 shadow-sm transition-colors shrink-0"><i class="fa-solid fa-rotate-left mr-1"></i> 기본 텍스트로 초기화</button>
+                                </div>
+                                <p class="text-[11.5px] text-blue-700 mt-2.5 font-medium bg-white px-3 py-2 rounded-lg border border-blue-100">※ 가로가 긴 형태의 로고 파일(PNG, JPG)을 업로드해주세요. (용량 제한: 1MB 이하) 업로드 시 메인 화면에 알맞은 크기로 <strong>자동 최적화</strong>됩니다.</p>
+                            </div>
+
+                            <div class="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-200 mb-5 flex items-center justify-between shadow-sm">
+                                <div>
+                                    <label class="block text-[12.5px] font-black text-gray-800 mb-1"><i class="fa-solid fa-quote-left text-blue-500 mr-1.5"></i> 데일리 명언 롤링 활성화</label>
+                                    <p class="text-[11px] text-gray-500">메인 화면 우측 상단에 매일 새로운 명언이 자동으로 표시됩니다. (OFF 시 시스템 표시등이 우측으로 자연스럽게 정렬됩니다)</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" x-model="isQuotesEnabled" @change="toggleQuotes()" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
+                                </label>
+                            </div>
+
+                            <div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-5">
+                                <label class="block text-[12.5px] font-black text-gray-800 mb-3"><i class="fa-solid fa-message text-blue-500 mr-1.5"></i> 메인 환영 메시지 설정</label>
+                                <div class="space-y-3">
+                                    <input type="text" x-model="data.content.welcomeTitle" placeholder="메인 큰 제목 (예: 다인치과 임직원 여러분 환영합니다.)" class="w-full px-3.5 py-2.5 text-[13px] font-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm outline-none">
+                                    <textarea x-model="data.content.welcomeDesc" rows="2" placeholder="서브 설명 (예: 다인치과의 비전과 사내 규정...)" class="w-full px-3.5 py-2.5 text-[12px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 shadow-sm outline-none resize-none"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <label class="block text-[12.5px] font-black text-blue-800"><i class="fa-solid fa-bars-staggered text-blue-500 mr-1.5"></i> 바로가기 버튼 동적 추가 (자동 레이아웃 최적화)</label>
+                                    <button @click="addShortcut" class="px-4 py-2 bg-blue-600 text-white text-[12px] font-bold rounded-lg hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> 버튼 추가</button>
+                                </div>
+                                <div class="flex flex-col gap-3.5">
+                                    <template x-for="(btn, idx) in (data.content.shortcuts || [])" :key="'sc_adm_'+idx">
+                                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm group hover:border-blue-300 transition-colors">
+                                            <div class="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+                                                <div class="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex-center shrink-0">
+                                                    <i class="fa-solid text-gray-500 text-[14px]" :class="getIconClass(btn.name)"></i>
+                                                </div>
+                                                <input type="text" x-model="btn.name" placeholder="버튼명 (예: 공식 홈페이지)" class="w-full sm:w-36 px-2.5 py-1.5 text-[12.5px] font-bold border-b-2 border-transparent focus:border-blue-500 bg-transparent outline-none transition-colors">
+                                            </div>
+                                            <div class="flex items-center gap-2.5 w-full flex-1">
+                                                <input type="text" x-model="btn.url" placeholder="https://..." class="w-full flex-1 px-3 py-1.5 text-[12px] text-gray-600 border-b-2 border-transparent focus:border-blue-500 bg-transparent outline-none transition-colors">
+                                                <button @click="data.content.shortcuts.splice(idx,1); saveData('content')" class="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 border border-gray-200 rounded-lg p-2 transition-colors shrink-0"><i class="fa-solid fa-xmark text-[14px]"></i></button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <p class="text-[11px] text-blue-600 mt-4 font-bold bg-white px-4 py-2.5 rounded-lg border border-blue-100 shadow-sm break-keep"><i class="fa-solid fa-circle-info mr-1"></i> 추가된 버튼 개수에 맞춰 메인 화면에 1열~4열로 가장 보기 좋게 <strong>자동 배열</strong>됩니다. 버튼 이름에 따라 아이콘이 자동 매칭됩니다.</p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-5. 병원소개 편집 -->
+                <template x-if="adminTab === 'info'">
+                    <div class="space-y-4 max-w-4xl mx-auto pb-6">
+                        <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[15px] mb-5 flex items-center gap-2"><i class="fa-solid fa-hospital text-blue-500"></i> 병원 소개 편집 (공식 홈페이지 기반 세팅)</h3>
+                            <div class="space-y-4.5">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                        <label class="block text-[12px] font-bold text-gray-600 mb-2"><i class="fa-solid fa-user-doctor mr-1.5 text-blue-500"></i> 대표원장 이름</label>
+                                        <input type="text" x-model="data.info.director" class="w-full px-3 py-2.5 text-[13px] font-black text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm outline-none">
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                        <label class="block text-[12px] font-bold text-gray-600 mb-2"><i class="fa-solid fa-phone mr-1.5 text-emerald-500"></i> 대표 전화번호</label>
+                                        <input type="text" x-model="data.info.tel" class="w-full px-3 py-2.5 text-[13px] font-bold text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm outline-none">
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4">
+                                    <label class="block text-[12px] font-bold text-gray-600 mb-2"><i class="fa-solid fa-location-dot mr-1.5 text-red-500"></i> 병원 주소 및 오시는 길</label>
+                                    <input type="text" x-model="data.info.address" class="w-full px-3 py-2.5 text-[13px] font-bold text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white mb-3 shadow-sm outline-none">
+                                    <textarea x-model="data.info.way" rows="3" class="w-full px-3 py-2.5 text-[12px] text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm resize-none outline-none leading-relaxed"></textarea>
+                                </div>
+                                <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100 mt-4">
+                                    <label class="block text-[12.5px] font-black text-blue-800 mb-3"><i class="fa-solid fa-star mr-1.5 text-blue-500"></i> 병원 3대 핵심 가치 / 시스템 (짧은 개조식 권장)</label>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                                        <textarea x-model="data.info.v1" rows="3" class="w-full px-3 py-2.5 text-[12.5px] font-bold text-gray-700 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm resize-none outline-none leading-relaxed"></textarea>
+                                        <textarea x-model="data.info.v2" rows="3" class="w-full px-3 py-2.5 text-[12.5px] font-bold text-gray-700 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm resize-none outline-none leading-relaxed"></textarea>
+                                        <textarea x-model="data.info.v3" rows="3" class="w-full px-3 py-2.5 text-[12.5px] font-bold text-gray-700 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white shadow-sm resize-none outline-none leading-relaxed"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-6. 복리후생 편집 -->
+                <template x-if="adminTab === 'welfare'">
+                    <div class="space-y-4 max-w-4xl mx-auto pb-6">
+                        <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[15px] mb-5 flex items-center gap-2"><i class="fa-solid fa-gift text-rose-500"></i> 복리후생 항목 편집 (한글 단어 기반 자동 아이콘 매칭)</h3>
+                            <div class="flex gap-2.5 mb-6 bg-rose-50/50 p-4 rounded-xl border border-rose-100 shadow-sm flex-wrap sm:flex-nowrap">
+                                <input type="text" x-model="newWelfare.title" placeholder="항목명 (예: 의료비 지원)" class="w-full sm:w-56 px-3.5 py-2.5 text-[12.5px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 font-bold bg-white shadow-sm outline-none transition-shadow">
+                                <input type="text" x-model="newWelfare.desc" placeholder="상세 내용 설명 (길게 작성해도 아코디언으로 깔끔하게 접힘)" class="flex-1 w-full px-3.5 py-2.5 text-[12px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 text-gray-700 bg-white shadow-sm outline-none transition-shadow" @keydown.enter="addWelfare">
+                                <button @click="addWelfare" class="w-full sm:w-auto px-6 py-2.5 bg-rose-500 text-white text-[12.5px] font-bold rounded-lg hover:bg-rose-600 shadow-sm transition-colors shrink-0">추가 등록</button>
+                            </div>
+                            <div class="space-y-3">
+                                <template x-for="(w, idx) in (data.welfares || [])" :key="'w_'+idx">
+                                    <div class="flex items-center gap-3.5 p-3 bg-gray-50 border border-gray-200 rounded-xl group hover:bg-white hover:border-blue-300 transition-colors shadow-sm w-full">
+                                        <div class="w-10 h-10 rounded-full bg-white flex-center border border-gray-200 shadow-sm shrink-0">
+                                            <i class="fa-solid text-[15px]" :class="getWelfareIcon(w.title)"></i>
+                                        </div>
+                                        <div class="flex-1 flex flex-col sm:flex-row gap-2.5 sm:gap-4 w-full">
+                                            <input type="text" x-model="w.title" @change="saveData('welfare')" class="w-full sm:w-48 px-2 py-1.5 text-[13px] font-black border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent focus:bg-white outline-none transition-colors">
+                                            <input type="text" x-model="w.desc" @change="saveData('welfare')" class="flex-1 w-full px-2 py-1.5 text-[12px] text-gray-600 border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent focus:bg-white outline-none transition-colors">
+                                        </div>
+                                        <button @click="data.welfares.splice(idx,1); saveData('welfare');" class="w-9 h-9 flex-center text-gray-400 hover:text-white hover:bg-red-500 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors shrink-0"><i class="fa-solid fa-trash-can text-[13px]"></i></button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-7. 사내 자료실/OJT 편집 -->
+                <template x-if="adminTab === 'files'">
+                    <div class="space-y-4 max-w-4xl mx-auto pb-6">
+                        <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="font-black text-gray-800 text-[15px] mb-5 flex items-center gap-2"><i class="fa-solid fa-folder-open text-amber-500"></i> 사내 자료실 & OJT 파일 첨부 및 상세 내용 입력</h3>
+                            <div class="flex flex-col gap-3.5 bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6 shadow-sm">
+                                <div class="flex flex-col sm:flex-row gap-2.5 items-center w-full">
+                                    <input type="file" id="adminFileInput" class="w-full sm:w-2/5 text-[12px] text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer bg-white border border-gray-300 rounded-lg p-1.5 outline-none shadow-sm transition-colors">
+                                    <input type="text" x-model="newFile.name" placeholder="표시할 제목 (선택 안 할 시 원본 파일명 표시)" class="w-full sm:flex-1 px-3.5 py-2.5 text-[12.5px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white font-bold outline-none shadow-sm transition-shadow">
+                                </div>
+                                <div class="flex flex-col sm:flex-row gap-2.5 items-start w-full">
+                                    <textarea x-model="newFile.desc" rows="3" placeholder="자료에 대한 상세 내용이나 열람 지시사항을 자유롭게 입력하세요. (개조식 권장)" class="w-full flex-1 px-3.5 py-2.5 text-[12px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 outline-none shadow-sm resize-none transition-shadow leading-relaxed"></textarea>
+                                    <button @click="uploadFile" class="w-full sm:w-auto sm:h-full px-7 py-3 bg-slate-800 text-white text-[13px] font-bold rounded-lg hover:bg-slate-700 shadow-sm transition-colors shrink-0 flex-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> 첨부 등록</button>
+                                </div>
+                            </div>
+                            <div class="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                                <template x-for="(file, idx) in (data.files || [])" :key="'f_'+idx">
+                                    <div class="flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors group">
+                                        <div class="flex items-start gap-3.5 w-full overflow-hidden">
+                                            <div class="text-[11.5px] font-black text-gray-400 w-7 text-center mt-1 shrink-0" x-text="`No.${data.files.length - idx}`"></div>
+                                            <div class="w-9 h-9 rounded-lg bg-blue-50 flex-center text-blue-500 border border-blue-100 shrink-0"><i class="fa-solid fa-file-lines text-[14px]"></i></div>
+                                            <div class="flex-1 min-w-0 pr-2">
+                                                <span class="text-[13px] font-black text-gray-800 block leading-tight truncate-text" x-text="file.name"></span>
+                                                <template x-if="file.desc">
+                                                    <span class="text-[11.5px] text-gray-600 block mt-1.5 whitespace-pre-line leading-relaxed" x-text="file.desc"></span>
+                                                </template>
+                                                <span class="text-[10px] text-gray-400 block mt-2 font-medium" x-text="file.date + ' 등록됨'"></span>
+                                            </div>
+                                        </div>
+                                        <button @click="data.files.splice(idx,1); saveData('files');" class="text-gray-400 hover:text-white hover:bg-red-500 bg-white border border-gray-200 rounded-lg w-9 h-9 flex-center transition-colors shrink-0 shadow-sm"><i class="fa-solid fa-trash-can text-[13px]"></i></button>
+                                    </div>
+                                </template>
+                                <template x-if="!(data.files && data.files.length > 0)">
+                                    <div class="p-12 text-center text-[12.5px] text-gray-400 font-medium bg-gray-50/50">등록된 사내 자료가 없습니다.</div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-8. 조회/통계 (그래프 시각화) -->
+                <template x-if="adminTab === 'qa'">
+                    <div class="space-y-4 max-w-4xl mx-auto pb-6">
+                        <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+                                <h3 class="font-black text-gray-800 text-[15px] flex items-center gap-2"><i class="fa-solid fa-chart-line text-purple-500"></i> 실시간 접속 세션 통계 및 시각화 그래프</h3>
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <select x-model="statType" class="text-[12.5px] px-3 py-2 border border-gray-300 rounded-lg text-gray-700 font-bold outline-none bg-white focus:ring-2 focus:ring-purple-500 shadow-sm cursor-pointer transition-shadow">
+                                        <option value="day">일별 (해당일)</option>
+                                        <option value="week">주별 (최근 7일)</option>
+                                        <option value="month">월별 (해당월 전체)</option>
+                                        <option value="year">연도별 (해당연도 전체)</option>
+                                    </select>
+                                    <input type="date" x-model="statDate" class="text-[12.5px] px-3.5 py-2 border border-gray-300 rounded-lg text-gray-700 font-bold outline-none bg-white focus:ring-2 focus:ring-purple-500 shadow-sm cursor-pointer transition-shadow">
+                                    <button @click="renderStatChart()" class="px-5 py-2 bg-purple-600 text-white text-[12.5px] font-bold rounded-lg shadow-sm hover:bg-purple-700 transition-colors flex items-center gap-1.5"><i class="fa-solid fa-magnifying-glass"></i> 조회</button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-200 shadow-inner">
+                                <h4 class="text-[13px] font-black text-gray-800 mb-4" x-text="showChart ? `[${statType === 'day' ? '일별' : (statType === 'week' ? '주별' : (statType === 'month' ? '월별' : '연도별'))}] ${statDate} 기준 접속 통계 (세션 기반)` : '날짜를 선택하고 차트 조회를 클릭하세요.'"></h4>
+                                <div class="h-72 w-full relative flex-center">
+                                    <canvas id="statChart" class="w-full h-full"></canvas>
+                                    <div x-show="!showChart" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                                        <i class="fa-solid fa-chart-column text-5xl mb-3 opacity-30"></i>
+                                        <span class="text-[12px] font-medium">데이터 대기 중</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-[11.5px] text-gray-500 mt-5 leading-relaxed bg-blue-50/50 p-3.5 rounded-xl border border-blue-100 break-keep">
+                                <i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> 기간 조건에 따른 <strong>실제 방문 횟수</strong>와 시스템 최초 오픈 후 누적된 <strong>총 방문 횟수(Total)</strong>를 시각화하여 비교합니다.<br>
+                                ※ 클라우드(Firebase) 실시간 세션 연동 방식으로 1회 접속 시 조작 없이 즉각 반영됩니다.
+                            </p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 1-9. 비밀번호 변경 -->
+                <template x-if="adminTab === 'pwd'">
+                    <div class="space-y-4 max-w-lg mx-auto pb-6">
+                        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 text-center">
+                            <div class="w-16 h-16 bg-slate-100 rounded-full flex-center mx-auto mb-5 border border-slate-200 shadow-inner">
+                                <i class="fa-solid fa-shield-halved text-slate-700 text-2xl"></i>
+                            </div>
+                            <h3 class="font-black text-gray-800 text-[16px] mb-2">보안 비밀번호 변경</h3>
+                            <p class="text-[12px] text-gray-500 mb-6 break-keep">관리자 모드 및 일반 직원의 Q&A 게시글 삭제 시 사용되는 4자리 공용 보안 비밀번호를 변경합니다.</p>
+                            
+                            <div class="space-y-4 text-left">
+                                <div>
+                                    <label class="block text-[11.5px] font-bold text-gray-700 mb-1.5">현재 비밀번호</label>
+                                    <input type="password" x-model="pwdChange.current" placeholder="기존 4자리 입력" maxlength="4" class="w-full px-4 py-3 text-[14px] text-center tracking-[0.3em] font-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-gray-50 outline-none shadow-sm transition-shadow">
+                                </div>
+                                <div>
+                                    <label class="block text-[11.5px] font-bold text-gray-700 mb-1.5">새 비밀번호</label>
+                                    <input type="password" x-model="pwdChange.new" placeholder="변경할 4자리 입력" maxlength="4" class="w-full px-4 py-3 text-[14px] text-center tracking-[0.3em] font-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm transition-shadow">
+                                </div>
+                                <button @click="updatePassword" class="w-full py-3.5 mt-2 bg-slate-900 text-white text-[13px] font-bold rounded-xl hover:bg-slate-800 shadow-md transition-colors">비밀번호 변경하기</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </main>
+
+    <!-- [2. 사용자 게이트웨이 메인 화면] -->
+    <main class="flex-grow flex flex-col items-center justify-start bg-[#f8fafc] print-container relative w-full overflow-hidden" x-show="!isAdminMode">
+        
+        <header class="w-full bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm print-hide h-[64px] flex items-center shrink-0">
+            <div class="max-w-[1200px] w-full mx-auto px-4 flex justify-between items-center h-full">
+                
+                <!-- 2-1. 헤더 로고 (관리자 커스텀 업로드 지원) -->
+                <div class="flex items-center gap-2 cursor-pointer h-full py-1.5 shrink-0" @click="activeMenu = 'main'">
+                    <template x-if="data.logoUrl">
+                        <img :src="data.logoUrl" alt="공식 로고" class="h-8 sm:h-10 w-auto max-w-[200px] object-contain drop-shadow-sm">
+                    </template>
+                    <template x-if="!data.logoUrl">
+                        <div class="flex items-center gap-2 sm:gap-2.5">
+                            <div class="flex flex-col justify-center h-full pt-1">
+                                <span class="text-[9px] font-black text-gray-500 tracking-[0.2em] leading-none mb-0.5">NO.1 DAIN</span>
+                                <div class="flex items-baseline">
+                                    <span class="text-[17px] sm:text-[20px] font-black text-[#144d9f] tracking-tighter leading-none">다인</span>
+                                    <span class="text-[17px] sm:text-[20px] font-black text-[#4b5563] tracking-tighter leading-none">치과병원</span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- 2-2. 시스템 감지기 & 통계 (명언 OFF 시 우측 정렬 완벽 최적화) -->
+                <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 transition-all duration-500 ease-in-out" :class="isQuotesEnabled ? 'justify-end' : 'justify-end'">
+                    <!-- 데일리 명언 롤링 영역 -->
+                    <div x-show="isQuotesEnabled && currentQuote.text" x-transition.opacity.duration.300ms class="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg shadow-sm max-w-[350px] shrink-0 truncate mr-auto">
+                        <i class="fa-solid fa-quote-left text-blue-400 text-[10px]"></i>
+                        <span class="text-[11.5px] text-gray-600 font-bold italic truncate flex-1 min-w-0" x-text="currentQuote.text"></span>
+                        <span class="text-[10px] text-gray-400 font-bold shrink-0 ml-1" x-text="'- ' + currentQuote.author"></span>
+                    </div>
+
+                    <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10.5px] font-bold transition-all shadow-sm shrink-0"
+                         :class="systemStatus === 'normal' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'">
+                        <div class="w-2.5 h-2.5 rounded-full" :class="systemStatus === 'normal' ? 'bg-green-500 status-pulse' : 'bg-red-500 status-error'"></div>
+                        <span x-text="systemStatus === 'normal' ? '시스템 정상 작동중' : '오프라인 (자동 복구중)'"></span>
+                    </div>
+
+                    <div class="bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg shadow-inner flex items-center gap-2.5 shrink-0">
+                        <span class="text-[11px] font-bold text-gray-500">오늘 <span class="text-blue-600 text-[12.5px] font-black ml-0.5" x-text="todayVisits"></span></span>
+                        <div class="w-px h-3.5 bg-gray-300"></div>
+                        <span class="text-[11px] font-bold text-gray-500">누적 <span class="text-gray-800 text-[12.5px] font-black ml-0.5" x-text="totalVisits"></span></span>
+                    </div>
+                    <button @click="showAdminLogin = true" class="px-3.5 py-1.5 text-[11px] font-bold text-gray-600 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-lock text-[10.5px]"></i> <span class="hidden sm:inline">관리자</span></button>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-[1200px] w-full mx-auto px-3 sm:px-4 py-3 sm:py-4 flex-1 overflow-y-auto hide-scrollbar flex flex-col print-container relative">
+            <button x-show="activeMenu !== 'main'" @click="window.print()" class="absolute top-4 right-4 z-50 print-hide px-4 py-2 bg-slate-800 text-white text-[12px] font-bold rounded-lg shadow-md hover:bg-slate-700 flex items-center gap-1.5 transition-colors">
+                <i class="fa-solid fa-print"></i> 인쇄하기
+            </button>
+
+            <!-- [메인 대시보드 UI] -->
+            <template x-if="activeMenu === 'main'">
+                <div class="w-full flex-1 flex flex-col justify-center space-y-3 sm:space-y-4 animate-fade-in pb-2">
+                    <div class="w-full bg-white rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm print-hide shrink-0 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-[16px] sm:text-[18px] font-black text-gray-800 tracking-tight mb-1" x-text="data.content.welcomeTitle || '다인치과 임직원 여러분 환영합니다.'"></h2>
+                            <p class="text-[11.5px] sm:text-[12px] text-gray-500 font-medium break-keep" x-text="data.content.welcomeDesc || '다인치과의 비전과 사내 규정, 스케줄 및 다양한 정보를 확인하세요.'"></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 print-hide shrink-0 w-full">
+                        <template x-for="menu in [
+                            {id:'info', icon:'fa-hospital', title:'병원 소개', desc:'철학 및 인프라', color:'text-blue-600', bg:'bg-blue-50'},
+                            {id:'welfare', icon:'fa-gift', title:'복리후생', desc:'직원 혜택 상세', color:'text-blue-500', bg:'bg-blue-50/50'},
+                            {id:'schedule', icon:'fa-calendar-days', title:'직군별 스케줄', desc:'근무조/연차 현황', color:'text-blue-600', bg:'bg-blue-50', badge:'실시간'},
+                            {id:'qa', icon:'fa-comments', title:'Q&A 건의', desc:'전용 질문게시판', color:'text-blue-500', bg:'bg-blue-50/50'}
+                        ]" :key="menu.id">
+                            <button @click="activeMenu = menu.id" class="group bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all text-center relative flex flex-col items-center justify-center min-h-[95px] sm:min-h-[110px] w-full">
+                                <template x-if="menu.badge"><span class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9.5px] font-black px-2 py-0.5 rounded-bl-lg rounded-tr-xl shadow-sm z-10 tracking-wider" x-text="menu.badge"></span></template>
+                                <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex-center mb-2 transition-transform group-hover:scale-110 group-hover:bg-blue-100 shrink-0" :class="menu.bg">
+                                    <i class="fa-solid text-[15px] sm:text-[16px]" :class="[menu.icon, menu.color]"></i>
+                                </div>
+                                <h3 class="font-black text-gray-800 text-[13px] sm:text-[14px] mb-0.5 tracking-tight group-hover:text-blue-700 truncate-text w-full" x-text="menu.title"></h3>
+                                <p class="text-[10px] sm:text-[11px] text-gray-400 font-medium truncate-text w-full" x-text="menu.desc"></p>
+                            </button>
+                        </template>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-[1.2fr_1.8fr] gap-3 sm:gap-4 print-hide flex-1 min-h-0 w-full">
+                        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-3.5 sm:p-4 flex flex-col h-full overflow-hidden w-full">
+                            <div class="flex justify-between items-center mb-2.5 shrink-0">
+                                <h3 class="font-black text-blue-800 text-[13.5px] flex items-center gap-1.5"><i class="fa-solid fa-calendar-check text-blue-500"></i> <span x-text="`${currentYear}년 ${currentMonth}월 진료일정`"></span></h3>
+                                <div class="flex gap-1 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
+                                    <button @click="changeMonth(-1)" class="w-6 h-6 rounded-l-lg hover:bg-gray-100 flex-center text-gray-500"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
+                                    <button @click="changeMonth(1)" class="w-6 h-6 rounded-r-lg border-l border-gray-200 hover:bg-gray-100 flex-center text-gray-500"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-7 text-center border-t border-l border-gray-100 rounded-lg overflow-hidden flex-1 w-full h-full">
+                                <template x-for="(day, idx) in ['일','월','화','수','목','금','토']" :key="'g_cal_h_'+idx">
+                                    <div class="py-1 font-bold text-[10px] border-b border-r border-gray-100 bg-gray-50 flex-center" :class="idx===0 ? 'text-red-500' : (idx===6 ? 'text-blue-500' : 'text-gray-600')" x-text="day"></div>
+                                </template>
+                                <template x-for="dateObj in calendarDays" :key="'g_cal_d_'+dateObj.id">
+                                    <div class="border-b border-r border-gray-100 flex flex-col items-center justify-center min-h-[40px] sm:min-h-[48px] py-1" :class="!dateObj.dateStr ? 'bg-gray-50/30' : (isHoliday(dateObj.dateStr) ? 'bg-red-50/15' : 'bg-white')">
+                                        <template x-if="dateObj.dateStr">
+                                            <div class="flex flex-col items-center w-full">
+                                                <span class="text-[14px] sm:text-[16px] font-black leading-none" :class="isHoliday(dateObj.dateStr) ? 'text-red-500' : (dateObj.isSun ? 'text-red-500' : (dateObj.isSat ? 'text-blue-500' : 'text-gray-800'))" x-text="dateObj.day"></span>
+                                                <span class="text-[9.5px] sm:text-[10.5px] font-bold mt-1 truncate-text w-full text-center px-1 leading-none tracking-tighter" :class="isHoliday(dateObj.dateStr) ? 'text-red-500' : 'text-gray-400'" x-text="isHoliday(dateObj.dateStr) ? '휴무' : '정상'"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-3 sm:gap-4 h-full overflow-hidden w-full">
+                            <div class="grid gap-2.5 sm:gap-3 shrink-0 w-full" :class="{
+                                'grid-cols-1': (data.content.shortcuts || []).length === 1,
+                                'grid-cols-2': (data.content.shortcuts || []).length === 2,
+                                'grid-cols-2 sm:grid-cols-3': (data.content.shortcuts || []).length === 3,
+                                'grid-cols-2 md:grid-cols-4': (data.content.shortcuts || []).length >= 4
+                            }">
+                                <template x-for="(btn, idx) in (data.content.shortcuts || [])" :key="'main_sc_'+idx">
+                                    <a :href="btn.url" target="_blank" class="w-full text-white rounded-2xl p-3 flex items-center gap-3 shadow-sm transition-colors group relative overflow-hidden h-[58px] sm:h-[64px]" :class="getShortcutStyle(idx).bg">
+                                        <div class="absolute -right-3 -bottom-3 opacity-15 transform group-hover:scale-150 transition-transform"><i class="fa-solid text-[40px] sm:text-[45px]" :class="getIconClass(btn.name)"></i></div>
+                                        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white flex-center shrink-0 group-hover:bg-gray-50 shadow-sm z-10"><i class="fa-solid text-[13px] sm:text-[14px]" :class="[getIconClass(btn.name), getShortcutStyle(idx).iconColor]"></i></div>
+                                        <div class="truncate-text z-10 flex-1 min-w-0 pr-1">
+                                            <div class="font-black text-[11.5px] sm:text-[12px] tracking-tight mb-0.5 truncate-text w-full" x-text="btn.name"></div>
+                                            <div class="text-[9.5px] sm:text-[10px] text-white/80 font-medium truncate-text w-full" x-text="(btn.url || '').replace('https://', '').replace('www.', '')"></div>
+                                        </div>
+                                    </a>
+                                </template>
+                            </div>
+
+                            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm flex-1 flex flex-col p-4 overflow-hidden w-full">
+                                <h3 class="font-black text-gray-800 text-[13.5px] mb-3 flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-folder-open text-amber-500"></i> 사내 자료실 & OJT</h3>
+                                <div class="flex-1 overflow-y-auto hide-scrollbar space-y-2 w-full pr-1">
+                                    <template x-for="(file, idx) in (data.files || [])" :key="'uf_'+idx">
+                                        <div class="group flex items-start gap-2.5 p-2.5 bg-gray-50 rounded-xl border border-gray-100 hover:bg-blue-50/60 hover:border-blue-200 transition-colors cursor-pointer w-full" @click="downloadFile(file)">
+                                            <div class="text-[10.5px] font-black text-gray-400 w-6 text-center mt-0.5 shrink-0" x-text="`No.${data.files.length - idx}`"></div>
+                                            <div class="flex-1 min-w-0 overflow-hidden pr-2">
+                                                <div class="font-bold text-[12.5px] text-gray-700 group-hover:text-blue-700 leading-tight flex items-center gap-1.5 truncate-text">
+                                                    <i class="fa-solid fa-file-pdf text-red-400 text-[11.5px] shrink-0"></i> <span class="truncate-text" x-text="file.name"></span>
+                                                </div>
+                                                <template x-if="file.desc">
+                                                    <div class="text-[11px] text-gray-500 mt-1.5 whitespace-pre-line leading-relaxed line-clamp-2" x-text="file.desc"></div>
+                                                </template>
+                                            </div>
+                                            <div class="text-[9px] sm:text-[9.5px] text-gray-400 w-14 text-right font-medium shrink-0 mt-0.5" x-text="file.date"></div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!(data.files && data.files.length > 0)">
+                                        <div class="h-full flex-center text-[12px] text-gray-400 font-medium">등록된 자료가 없습니다.</div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border-l-4 border-l-blue-500 border-y border-r border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm print-hide text-[11.5px] sm:text-[12px] bg-gradient-to-r from-blue-50/50 to-white shrink-0 w-full overflow-hidden">
+                        <div class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-black flex-center gap-1.5 shrink-0 border border-blue-200"><i class="fa-solid fa-bell text-[11px] animate-pulse"></i> 실시간 알림</div>
+                        <div class="font-bold text-gray-700 truncate-text flex-1 min-w-0" x-text="data.content?.latestUpdateText || '최신 정보로 동기화되었습니다.'"></div>
+                        <div class="text-[10px] sm:text-[10.5px] text-gray-400 font-medium shrink-0" x-text="data.content?.latestUpdateDate || ''"></div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- 서브 공통 헤더 -->
+            <div x-show="activeMenu !== 'main'" class="w-full mb-5 relative flex-center print-hide shrink-0 animate-fade-in-up mt-2">
+                <button @click="activeMenu = 'main'" class="absolute left-0 w-9 h-9 flex-center bg-white border border-gray-200 rounded-full text-gray-600 hover:bg-gray-50 shadow-sm transition-colors"><i class="fa-solid fa-arrow-left text-[13px]"></i></button>
+                <h2 class="text-[16px] sm:text-[18px] font-black tracking-tight text-gray-900" 
+                    x-text="activeMenu === 'info' ? '병원 소개' : (activeMenu === 'welfare' ? '복리후생' : (activeMenu === 'schedule' ? '직군별 스케줄' : 'Q&A 건의게시판'))"></h2>
+            </div>
+
+            <!-- [2-3. 서브: 병원 소개] -->
+            <template x-if="activeMenu === 'info'">
+                <div class="w-full max-w-4xl mx-auto animate-fade-in-up flex-1 flex flex-col print-container pb-8">
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
+                        <div class="bg-gradient-to-br from-blue-900 via-blue-800 to-slate-900 p-8 sm:p-10 text-center print:bg-white print:text-black relative overflow-hidden shrink-0">
+                            
+                            <!-- 서브 병원소개 로고 (관리자 업로드 로고 자동 연동) -->
+                            <div class="flex-center mb-6 relative z-10 bg-white py-3.5 px-6 rounded-2xl shadow-xl inline-flex mx-auto min-h-[60px] min-w-[180px]">
+                                <template x-if="data.logoUrl">
+                                    <img :src="data.logoUrl" alt="공식 로고" class="h-10 sm:h-12 w-auto max-w-[250px] object-contain">
+                                </template>
+                                <template x-if="!data.logoUrl">
+                                    <div class="flex flex-col justify-center text-left">
+                                        <span class="text-[10px] font-black text-gray-500 tracking-[0.2em] leading-none mb-0.5">NO.1 DAIN</span>
+                                        <div class="flex items-baseline">
+                                            <span class="text-[22px] font-black text-[#144d9f] tracking-tighter leading-none">다인</span>
+                                            <span class="text-[22px] font-black text-[#4b5563] tracking-tighter leading-none">치과병원</span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                            
+                            <h3 class="text-[20px] sm:text-[22px] font-black text-white print:text-black relative z-10" x-text="(data.info?.director || '허영준') + ' 대표원장'"></h3>
+                            <p class="text-[13px] sm:text-[14px] text-blue-100 mt-2 font-medium print:text-gray-600 relative z-10">환자 중심의 맞춤형 진료, 정직하고 올바른 진료로 보답하겠습니다.</p>
+                            <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-white opacity-5 rounded-full blur-2xl"></div>
+                            <div class="absolute -left-10 -top-10 w-40 h-40 bg-blue-400 opacity-10 rounded-full blur-xl"></div>
+                        </div>
+                        
+                        <div class="p-6 sm:p-8 space-y-6 sm:space-y-8 flex-1 overflow-y-auto bg-white border-t-4 border-blue-500">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 border-b border-gray-100 pb-6">
+                                <div class="flex gap-4 items-start">
+                                    <div class="w-11 h-11 rounded-2xl bg-blue-50 flex-center text-blue-600 shrink-0 border border-blue-100 shadow-sm"><i class="fa-solid fa-location-dot text-[18px]"></i></div>
+                                    <div>
+                                        <h4 class="text-[13px] font-black text-gray-500 mb-1.5">병원 주소 / 오시는 길</h4>
+                                        <p class="text-[13px] sm:text-[14px] font-bold text-gray-800 break-keep leading-tight mb-2" x-text="data.info?.address || '서울특별시 노원구 노해로 507 와우쇼핑몰 5층'"></p>
+                                        <p class="text-[11.5px] sm:text-[12px] text-gray-500 whitespace-pre-line leading-relaxed" x-text="data.info?.way || '지하철 4호선 노원역 1번 출구 도보 3분\n7호선 노원역 4번 출구 도보 5분'"></p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 items-start">
+                                    <div class="w-11 h-11 rounded-2xl bg-emerald-50 flex-center text-emerald-600 shrink-0 border border-emerald-100 shadow-sm"><i class="fa-solid fa-phone text-[18px]"></i></div>
+                                    <div>
+                                        <h4 class="text-[13px] font-black text-gray-500 mb-1.5">진료 예약 및 대표전화</h4>
+                                        <p class="text-[16px] sm:text-[18px] font-black text-gray-800 tracking-wider mb-2" x-text="data.info?.tel || '02-952-2275'"></p>
+                                        <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+                                            <p class="text-[11px] font-bold text-gray-600 flex justify-between"><span class="w-12">월금(야간)</span> <span>09:30 ~ 21:00</span></p>
+                                            <p class="text-[11px] font-bold text-gray-600 flex justify-between"><span class="w-12">화 / 수</span> <span>09:30 ~ 19:00 / 18:30</span></p>
+                                            <p class="text-[11px] font-bold text-gray-600 flex justify-between"><span class="w-12">토 요 일</span> <span>09:30 ~ 14:00 (점심없음)</span></p>
+                                            <p class="text-[11px] font-bold text-red-500 flex justify-between"><span class="w-12">목 / 일</span> <span>정기 휴진</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-[14px] sm:text-[15px] font-black text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-gem text-blue-500"></i> 다인치과 3대 핵심 시스템</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <template x-for="(v, i) in [
+                                        data.info?.v1 || '분야별 4인 원장\n대학병원급 협진 시스템', 
+                                        data.info?.v2 || '1DAY 보철 시스템\n단 하루만에 끝나는 진료', 
+                                        data.info?.v3 || '철저한 멸균 관리\n100% 멸균 기구 1인 1기구 사용'
+                                    ]" :key="'vv_'+i">
+                                        <div class="bg-gradient-to-b from-white to-gray-50 p-5 rounded-2xl border border-gray-200 flex flex-col min-h-[110px] shadow-sm hover:shadow-md hover:border-blue-300 transition-all relative overflow-hidden group">
+                                            <div class="absolute -right-3 -top-3 text-6xl font-black text-gray-50 opacity-50 group-hover:text-blue-50 transition-colors" x-text="'0'+(i+1)"></div>
+                                            <div class="text-[18px] font-black text-blue-500 mb-3 leading-none relative z-10" x-text="'0'+(i+1)+'.'"></div>
+                                            <p class="text-[12.5px] sm:text-[13.5px] font-bold text-gray-800 break-keep whitespace-pre-line leading-relaxed relative z-10" x-text="v"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- [2-4. 서브: 복리후생] -->
+            <template x-if="activeMenu === 'welfare'">
+                <div class="w-full max-w-4xl mx-auto animate-fade-in-up pb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                        <template x-for="(w, idx) in (data.welfares && data.welfares.length > 0 ? data.welfares : [{title:'등록된 복리후생 항목이 없습니다.', desc:''}])" :key="'u_w_'+idx">
+                            <div x-data="{ open: false }" class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow w-full">
+                                <button @click="open = !open" class="w-full p-4 flex items-center justify-between bg-white text-left outline-none">
+                                    <div class="flex items-center gap-3.5 w-full pr-3">
+                                        <div class="w-11 h-11 rounded-full bg-rose-50 flex-center text-rose-500 shrink-0 border border-rose-100">
+                                            <i class="fa-solid text-[16px]" :class="getWelfareIcon(w.title)"></i>
+                                        </div>
+                                        <h3 class="font-black text-gray-800 text-[13.5px] sm:text-[14.5px] truncate-text w-full" x-text="w.title"></h3>
+                                    </div>
+                                    <div class="w-7 h-7 rounded-full bg-gray-50 flex-center shrink-0 border border-gray-200">
+                                        <i class="fa-solid fa-chevron-down text-gray-500 text-[12px] transition-transform duration-300" :class="open ? 'rotate-180' : ''"></i>
+                                    </div>
+                                </button>
+                                <div x-show="open" x-collapse>
+                                    <div class="p-5 pt-0 bg-white text-[12px] sm:text-[12.5px] text-gray-600 font-medium leading-relaxed whitespace-pre-line border-t border-gray-50 mt-1" x-text="w.desc"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- [2-5. 서브: 직군별 스케줄] (모바일 고정 및 31일 레이아웃 100% 보존) -->
+            <template x-if="activeMenu === 'schedule'">
+                <div class="w-full mx-auto animate-fade-in-up flex flex-col h-[calc(100vh-110px)] print-container print:h-auto pb-2 relative">
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden print:border-none print:shadow-none p-1.5 relative w-full border-b-4 border-b-blue-400">
+                        
+                        <div class="p-3 border-b border-gray-100 flex items-center justify-between bg-white shrink-0 flex-wrap gap-2.5 print-hide rounded-t-2xl z-30">
+                            <div class="flex items-center gap-2">
+                                <select x-model="selectedGroup" class="bg-gray-50 border border-gray-300 text-gray-700 text-[12px] sm:text-[12.5px] rounded-lg focus:ring-blue-500 px-3 sm:px-4 py-2 font-bold shadow-sm outline-none cursor-pointer">
+                                    <option value="전체">전체 파트 보기</option>
+                                    <template x-for="g in (data.groups || [])" :key="'gs_'+g"><option :value="g" x-text="g"></option></template>
+                                </select>
+                                <div class="flex gap-1 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                                    <button @click="changeMonth(-1)" class="w-8 h-8 hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-left text-[11px]"></i></button>
+                                    <div class="w-14 sm:w-16 flex-center font-black text-[13px] sm:text-[14px] text-gray-800 border-x border-gray-100 bg-gray-50" x-text="`${currentMonth}월`"></div>
+                                    <button @click="changeMonth(1)" class="w-8 h-8 hover:bg-gray-50 flex-center text-gray-500"><i class="fa-solid fa-chevron-right text-[11px]"></i></button>
+                                </div>
+                            </div>
+                            <div class="flex gap-1.5 flex-wrap justify-end hidden md:flex">
+                                <template x-for="type in (data.shiftTypes || []).filter(t => t.code !== '' && t.code !== '정상')" :key="'leg_u_'+type.code">
+                                    <span class="text-[10.5px] font-bold px-2 py-1 rounded shadow-sm border border-black/5 truncate-text max-w-[110px]" :class="type.color + ' ' + type.bgText" x-text="type.code + (type.label ? `(${type.label})` : '')"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- 테두리 진하게(border-gray-400) & 좌측 4열 Sticky 적용 (원본 보존) -->
+                        <div class="table-wrapper flex-1 p-0 hide-scrollbar rounded-b-2xl print:overflow-visible print:border-none relative z-20 bg-white admin-compact">
+                            <table class="w-full text-center border-collapse table-fixed min-w-max border-r border-gray-400 border-b border-gray-400">
+                                <thead class="bg-gray-100 sticky top-0 z-30 print:static shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
+                                    <tr>
+                                        <th class="w-[26px] md:w-[30px] min-w-[26px] md:min-w-[30px] border-b border-r border-gray-400 py-2 md:py-3 text-[10px] md:text-[11px] text-gray-700 font-bold sticky left-0 sticky-col bg-gray-100 shadow-[1px_0_0_#94a3b8] text-center">No.</th>
+                                        <th class="w-[55px] md:w-[65px] min-w-[55px] md:min-w-[65px] border-b border-r border-gray-400 py-2 md:py-3 text-[11px] md:text-[12px] text-gray-700 font-bold sticky left-[26px] md:left-[30px] sticky-col bg-gray-100 shadow-[1px_0_0_#94a3b8] whitespace-nowrap">직군</th>
+                                        <th class="w-[50px] md:w-[55px] min-w-[50px] md:min-w-[55px] border-b border-r border-gray-400 py-2 md:py-3 text-[11.5px] md:text-[12px] text-gray-700 font-bold sticky left-[81px] md:left-[95px] sticky-col bg-gray-100 shadow-[1px_0_0_#94a3b8] whitespace-nowrap">이름</th>
+                                        <th class="w-[40px] md:w-[45px] min-w-[40px] md:min-w-[45px] border-b border-r-2 border-gray-500 py-2 md:py-3 text-[10.5px] md:text-[11px] text-blue-700 font-bold sticky left-[131px] md:left-[150px] sticky-col bg-blue-50 shadow-[2px_0_0_#64748b] truncate-text leading-tight">잔여<br>연차</th>
+                                        <template x-for="dateObj in calendarDays.filter(d => d.dateStr !== null)" :key="'u_th_'+dateObj.id">
+                                            <th class="w-[22px] md:w-[24px] lg:w-[26px] xl:w-[28px] min-w-[22px] md:min-w-[24px] lg:min-w-[26px] xl:min-w-[28px] border-b border-r border-gray-400 py-1.5 md:py-2" :class="isHoliday(dateObj.dateStr) ? 'bg-red-50/50' : ''">
+                                                <div class="text-[9px] md:text-[11px] font-black leading-none" :class="dateObj.isSun ? 'text-red-600' : (dateObj.isSat ? 'text-blue-600' : 'text-gray-800')" x-text="dateObj.day"></div>
+                                                <div class="text-[8px] md:text-[9px] text-gray-600 font-medium mt-0.5" x-text="dateObj.dayName"></div>
+                                            </th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(emp, index) in filteredEmployees" :key="'u_emp_'+emp.id">
+                                        <tr class="hover:bg-gray-50 transition-colors border-b border-gray-300">
+                                            <td class="border-r border-gray-400 py-2 md:py-3 text-[10px] md:text-[11px] font-bold text-gray-500 sticky left-0 sticky-col bg-white shadow-[1px_0_0_#94a3b8] text-center" x-text="index + 1"></td>
+                                            <td class="border-r border-gray-400 py-2 md:py-3 text-[11px] md:text-[11.5px] font-medium text-gray-700 sticky left-[26px] md:left-[30px] sticky-col bg-white shadow-[1px_0_0_#94a3b8] whitespace-nowrap" x-text="emp.group"></td>
+                                            <td class="font-black text-[11.5px] md:text-[12px] text-gray-800 border-r border-gray-400 py-2 md:py-3 sticky left-[81px] md:left-[95px] sticky-col bg-white shadow-[1px_0_0_#94a3b8] whitespace-nowrap" x-text="emp.name"></td>
+                                            <td class="font-black text-[11px] md:text-[12px] text-blue-700 border-r-2 border-gray-500 py-2 md:py-3 sticky left-[131px] md:left-[150px] sticky-col bg-blue-50/40 shadow-[2px_0_0_#64748b] truncate-text whitespace-nowrap text-center" x-text="getRemainLeaves(emp)"></td>
+                                            
+                                            <template x-for="dateObj in calendarDays.filter(d => d.dateStr !== null)" :key="'u_td_'+emp.id+'_'+dateObj.id">
+                                                <td class="p-0 border-r border-gray-400 w-[22px] md:w-[24px] lg:w-[26px] xl:w-[28px] min-w-[22px] md:min-w-[24px] lg:min-w-[26px] xl:min-w-[28px] overflow-hidden h-[30px] md:h-[40px] lg:h-[45px]" 
+                                                    :class="isHoliday(dateObj.dateStr) ? 'bg-red-50/20' : getCellStyle(emp.id, dateObj.dateStr).bgClass">
+                                                    <div class="w-full h-full flex-center font-bold text-[8.5px] md:text-[10px] lg:text-[11px] overflow-hidden px-0 tracking-tighter" 
+                                                         :class="isHoliday(dateObj.dateStr) ? 'text-red-600' : getCellStyle(emp.id, dateObj.dateStr).textClass">
+                                                        <span class="block w-full text-center whitespace-nowrap truncate-text" x-text="isHoliday(dateObj.dateStr) ? '휴무' : getCellStyle(emp.id, dateObj.dateStr).text"></span>
+                                                    </div>
+                                                </td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                    <template x-if="filteredEmployees.length === 0">
+                                        <tr><td :colspan="calendarDays.filter(d => d.dateStr !== null).length + 4" class="py-12 text-center text-gray-400 text-[12px] font-medium border-b border-gray-200">조회된 직원이 없습니다.</td></tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- [2-6. 서브: Q&A 건의 게시판] -->
+            <template x-if="activeMenu === 'qa'">
+                <div class="w-full max-w-3xl mx-auto animate-fade-in-up pb-10">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-4 flex justify-end w-full">
+                        <button @click="qaModalMode = 'new'; newQa = {title:'', content:'', pwd:'', attachedFile:''}; openQaModal = true;" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[12.5px] font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"><i class="fa-solid fa-pen"></i> 건의사항 등록하기</button>
+                    </div>
+                    
+                    <div class="space-y-4 w-full">
+                        <template x-for="(qa, idx) in (data.qaList || [])" :key="'u_qa_'+qa.id">
+                            <div x-data="{ open: false }" class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:border-blue-300 transition-colors w-full">
+                                <div class="p-4 sm:p-5 flex flex-col gap-2.5 cursor-pointer hover:bg-gray-50 transition-colors" @click="open = !open">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] sm:text-[10.5px] font-black px-2.5 py-1 rounded-md border shadow-sm shrink-0" :class="qa.answer ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-200 text-gray-500'" x-text="qa.answer ? '답변완료' : '접수됨'"></span>
+                                        <span class="text-[11px] sm:text-[11.5px] font-black text-blue-600 shrink-0" x-text="'No. ' + qa.seqNo"></span>
+                                        <span class="text-[10px] sm:text-[10.5px] text-gray-400 ml-auto shrink-0 font-medium" x-text="qa.date"></span>
+                                    </div>
+                                    <h4 class="font-black text-[13.5px] sm:text-[14.5px] text-gray-800 break-keep truncate-text w-full" x-text="qa.title"></h4>
+                                </div>
+                                <div x-show="open" x-collapse>
+                                    <div class="p-5 sm:p-6 pt-0 border-t border-gray-100 bg-gray-50 mt-1">
+                                        <div class="text-[12px] sm:text-[12.5px] text-gray-700 font-medium py-3 whitespace-pre-line leading-relaxed break-all" x-text="qa.content"></div>
+                                        <template x-if="qa.attachedFile">
+                                            <div class="text-[10.5px] sm:text-[11px] text-blue-600 font-bold bg-white border border-blue-200 rounded-lg px-3 py-1.5 mt-2 inline-block shadow-sm truncate-text max-w-full"><i class="fa-solid fa-paperclip mr-1.5"></i> 첨부파일: <span x-text="qa.attachedFile"></span></div>
+                                        </template>
+                                        <template x-if="qa.answer">
+                                            <div class="mt-5 p-4 sm:p-5 bg-blue-50/80 border border-blue-200 rounded-xl flex items-start gap-3 shadow-inner">
+                                                <i class="fa-solid fa-reply fa-rotate-180 text-blue-500 mt-1 text-[12px] sm:text-[13px] shrink-0"></i>
+                                                <div class="text-[12px] sm:text-[12.5px] font-bold text-blue-900 whitespace-pre-line leading-relaxed break-all" x-text="qa.answer"></div>
+                                            </div>
+                                        </template>
+                                        <div class="flex justify-end mt-5 gap-2.5">
+                                            <button @click="verifyQa('edit', qa)" class="text-[11px] sm:text-[11.5px] font-bold text-gray-500 hover:text-blue-600 px-3.5 py-1.5 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors">수정</button>
+                                            <button @click="verifyQa('delete', qa)" class="text-[11px] sm:text-[11.5px] font-bold text-gray-500 hover:text-red-600 px-3.5 py-1.5 bg-white border border-gray-200 rounded-lg shadow-sm transition-colors">삭제</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!(data.qaList && data.qaList.length > 0)">
+                            <div class="p-12 text-center text-gray-400 text-[12px] sm:text-[12.5px] font-medium border border-dashed border-gray-300 rounded-2xl bg-gray-50/50 w-full">등록된 건의사항이 없습니다.</div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- [3. 모달 (로그인/Q&A)] -->
+    <div x-show="showAdminLogin" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex-center print-hide w-full h-full" x-cloak>
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-8 mx-4" @click.away="showAdminLogin = false">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 bg-slate-900 rounded-full flex-center mx-auto mb-4 shadow-inner"><i class="fa-solid fa-lock text-white text-[22px]"></i></div>
+                <h3 class="text-[16px] font-black text-gray-800 tracking-tight">관리자 로그인</h3>
+            </div>
+            <input type="password" x-model="adminPwdInput" @keydown.enter="adminLogin" placeholder="비밀번호 4자리" maxlength="4" class="w-full px-4 py-3 text-center text-[15px] border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-black tracking-[0.3em] mb-5 bg-gray-50 outline-none shadow-sm">
+            <div class="flex gap-2.5 w-full">
+                <button @click="showAdminLogin = false" class="flex-1 py-3 bg-gray-100 text-gray-600 text-[12.5px] font-bold rounded-xl hover:bg-gray-200 transition-colors">취소</button>
+                <button @click="adminLogin" class="flex-1 py-3 bg-slate-900 text-white text-[12.5px] font-bold rounded-xl hover:bg-slate-800 shadow-md transition-colors">접속</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Q&A 작성 모달 -->
+    <div x-show="openQaModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex-center print-hide w-full h-full" x-cloak>
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-7 mx-4" @click.away="openQaModal = false">
+            <h3 class="text-[15px] sm:text-[16px] font-black text-gray-800 mb-5 flex items-center gap-2"><i class="fa-solid fa-pen-nib text-blue-600"></i> <span x-text="qaModalMode === 'new' ? '건의사항 등록' : '건의사항 수정'"></span></h3>
+            <div class="space-y-4 w-full">
+                <input type="text" x-model="newQa.title" placeholder="제목을 입력하세요" class="w-full px-4 py-3 text-[12px] sm:text-[12.5px] border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold bg-white shadow-sm outline-none">
+                <textarea x-model="newQa.content" rows="4" placeholder="상세 내용을 작성해주세요." class="w-full px-4 py-3 text-[12px] sm:text-[12.5px] border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 resize-none bg-white shadow-sm outline-none leading-relaxed"></textarea>
+                
+                <div class="flex items-center gap-2.5 border border-gray-300 rounded-xl p-2.5 bg-gray-50 shadow-inner w-full">
+                    <span class="text-[11px] sm:text-[11.5px] font-bold text-gray-500 px-2 whitespace-nowrap shrink-0">파일 첨부:</span>
+                    <input type="file" id="qaFileInput" class="w-full text-[11px] sm:text-[11.5px] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-700 cursor-pointer text-gray-500 outline-none">
+                </div>
+
+                <template x-if="isAdminMode && qaModalMode === 'edit'">
+                    <textarea x-model="newQa.answer" rows="3" placeholder="관리자 답변 입력" class="w-full px-4 py-3 text-[12px] sm:text-[12.5px] border-2 border-emerald-200 bg-emerald-50 rounded-xl focus:ring-2 focus:ring-emerald-500 resize-none font-bold text-emerald-900 shadow-sm outline-none"></textarea>
+                </template>
+                <template x-if="!isAdminMode">
+                    <input type="password" x-model="newQa.pwd" placeholder="게시글 비밀번호 4자리 (수정/삭제용)" maxlength="4" class="w-full px-4 py-3 text-[12.5px] sm:text-[13px] border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-black bg-white tracking-[0.2em] text-center shadow-sm outline-none">
+                </template>
+            </div>
+            <div class="flex gap-2.5 mt-5 sm:mt-6 w-full">
+                <button @click="openQaModal = false" class="flex-1 py-2.5 sm:py-3 bg-gray-100 text-gray-600 text-[12px] sm:text-[12.5px] font-bold rounded-xl hover:bg-gray-200 transition-colors">취소</button>
+                <button @click="saveQa" class="flex-1 py-2.5 sm:py-3 bg-blue-600 text-white text-[12px] sm:text-[12.5px] font-bold rounded-xl hover:bg-blue-700 shadow-md transition-colors">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [4. 자바스크립트 엔진 (실시간 연동 & 자동 복구 로직 보존)] -->
+    <script>
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dain-portal-master';
+        const fbConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        let db, auth, isDbConnected = false;
+        let setDoc, onSnapshot, increment, docFunc;
+
+        window.portalApp = function () {
+            return {
+                isAdminMode: false, showAdminLogin: false, adminPwdInput: '', systemStatus: 'loading',
+                activeMenu: 'main', adminTab: 'schedule_edit',
+                currentYear: new Date().getFullYear(), currentMonth: new Date().getMonth() + 1,
+                calendarDays: [], selectedGroup: '전체',
+                openQaModal: false, qaModalMode: 'new', newQa: { title: '', content: '', pwd: '', answer: '', attachedFile: '' },
+                statType: 'day', statDate: new Date().toISOString().slice(0,10), showChart: false,
+                newGroup: '', newEmp: { group: '', name: '', joinDate: '', usedLeaves: 0 },
+                newWelfare: { title: '', desc: '' }, newFile: { name: '', desc: '' },
+                pwdChange: { current: '', new: '' },
+                todayVisits: 0, totalVisits: 0,
+                
+                isQuotesEnabled: true,
+                currentQuote: { text: "환자의 밝은 미소가 우리의 가장 큰 보람입니다.", author: "의료진 일동" },
+                koreanQuotesDB: [
+                    { text: "치아 건강은 평생의 자산입니다. 오늘도 최고의 진료를 다합시다.", author: "의료진 일동" },
+                    { text: "환자의 밝은 미소가 우리의 가장 큰 보람입니다.", author: "다인치과병원" },
+                    { text: "작은 배려가 환자의 두려움을 없앱니다.", author: "다인치과" },
+                    { text: "철저한 감염관리는 기본이자 원칙입니다.", author: "다인치과병원" },
+                    { text: "정확한 진단, 정직한 진료. 우리가 지켜야 할 약속입니다.", author: "의료진 일동" },
+                    { text: "오늘 하루도 서로 돕고 배려하는 다인인이 됩시다.", author: "원장단" }
+                ],
+                
+                adminTabs: [
+                    { id: 'schedule_edit', name: '통합 스케줄 편집', icon: 'fa-table-cells' },
+                    { id: 'legend', name: '메인 달력 관리', icon: 'fa-calendar-day' },
+                    { id: 'emp', name: '직원 / 연차 관리', icon: 'fa-users' },
+                    { id: 'content', name: '게이트웨이 설정', icon: 'fa-link' },
+                    { id: 'info', name: '병원소개 편집', icon: 'fa-hospital' },
+                    { id: 'welfare', name: '복리후생 편집', icon: 'fa-gift' },
+                    { id: 'files', name: '자료실 / OJT', icon: 'fa-folder-open' },
+                    { id: 'qa', name: '조회 통계 / Q&A', icon: 'fa-chart-pie' },
+                    { id: 'pwd', name: '비밀번호 변경', icon: 'fa-shield-halved' }
+                ],
+
+                data: {
+                    pwd: '1234', leaveStandard: 'join', defaultHolidays: ['0', '4'], customHolidays: [],
+                    logoUrl: '', /* ★ 신규 추가된 관리자 업로드 로고 URL 저장 공간 ★ */
+                    groups: ['치과의사', '치과위생사', '코디네이터', '경영지원'], employees: [],
+                    shiftTypes: [
+                        { code: '정상', label: '기본 정상', color: 'bg-transparent', bgText: 'text-gray-800', deduction: 0 },
+                        { code: 'A', label: 'A조(09:00~18:00)', color: 'bg-blue-500', bgText: 'text-white', deduction: 0 },
+                        { code: 'B', label: 'B조(11:00~20:00)', color: 'bg-emerald-500', bgText: 'text-white', deduction: 0 },
+                        { code: 'C', label: 'C조(13:00~22:00)', color: 'bg-indigo-500', bgText: 'text-white', deduction: 0 },
+                        { code: '연차', label: '종일 연차', color: 'bg-purple-500', bgText: 'text-white', deduction: 1 },
+                        { code: '반차', label: '반차(0.5)', color: 'bg-amber-400', bgText: 'text-white', deduction: 0.5 }
+                    ],
+                    schedules: {},
+                    content: { 
+                        welcomeTitle: "다인치과 임직원 여러분 환영합니다.",
+                        welcomeDesc: "다인치과의 비전과 사내 규정, 스케줄 및 다양한 정보를 확인하세요.",
+                        shortcuts: [
+                            { name: "공식 홈페이지", url: "https://www.ndaindental.co.kr/" },
+                            { name: "공식 블로그", url: "https://blog.naver.com/nndain" }
+                        ],
+                        latestUpdateText: "", latestUpdateDate: "" 
+                    },
+                    files: [],
+                    info: { director: "허영준", tel: "02-952-2275", address: "서울특별시 노원구 노해로 507 와우쇼핑몰 5층", way: "지하철 4호선 노원역 1번 출구 도보 3분\n7호선 노원역 4번 출구 도보 5분", v1: "분야별 4인 원장\n대학병원급 협진 시스템", v2: "1DAY 보철 시스템\n단 하루만에 끝나는 진료", v3: "철저한 멸균 관리\n100% 멸균 기구 1인 1기구 사용" },
+                    welfares: [], qaList: []
+                },
+
+                async init() {
+                    this.loadLocalData();
+                    this.generateCalendar();
+                    this.fetchDailyQuote();
+                    
+                    this.connectFirebase();
+
+                    window.addEventListener('storage', (e) => {
+                        if (e.key === 'ndain_portal_master_v4') { 
+                            this.loadLocalData(); 
+                            this.data = JSON.parse(JSON.stringify(this.data));
+                            this.generateCalendar(); 
+                        }
+                    });
+
+                    document.addEventListener("visibilitychange", () => {
+                        if (document.visibilityState === "visible") {
+                            if (!isDbConnected || this.systemStatus === 'error') this.connectFirebase();
+                        }
+                    });
+
+                    setInterval(() => {
+                        if (!isDbConnected || this.systemStatus === 'error') this.connectFirebase();
+                    }, 10000);
+                },
+
+                // ★ 신규 로고 업로드 로직 (Base64 변환 및 용량 검증) ★
+                uploadLogo(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    if (!file.type.startsWith('image/')) {
+                        Swal.fire('오류', '이미지 파일만 업로드 가능합니다.', 'error');
+                        event.target.value = '';
+                        return;
+                    }
+
+                    if (file.size > 1024 * 1024) {
+                        Swal.fire('알림', '시스템 안정을 위해 1MB 이하의 이미지만 업로드 가능합니다. 이미지 크기를 줄여주세요.', 'warning');
+                        event.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.data.logoUrl = e.target.result;
+                        this.saveDataSilent('content');
+                        Swal.fire('성공', '포털 공식 로고가 완벽하게 교체되었습니다.', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                async connectFirebase() {
+                    if (isDbConnected) return;
+                    try {
+                        if (!fbConfig) throw new Error("No Config");
+                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                        const { getAuth, signInAnonymously, signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                        const { getFirestore, doc, setDoc: fbSetDoc, onSnapshot: fbOnSnapshot, increment: fbIncrement } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                        
+                        const app = initializeApp(fbConfig);
+                        auth = getAuth(app);
+                        db = getFirestore(app);
+                        docFunc = doc; setDoc = fbSetDoc; onSnapshot = fbOnSnapshot; increment = fbIncrement;
+
+                        let token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (token) await signInWithCustomToken(auth, token);
+                        else await signInAnonymously(auth);
+
+                        isDbConnected = true;
+                        this.systemStatus = 'normal';
+
+                        const docRef = docFunc(db, 'artifacts', appId, 'public', 'data', 'masterData', 'v4');
+                        onSnapshot(docRef, (snapshot) => {
+                            try {
+                                if (snapshot.exists()) {
+                                    this.mergeData(snapshot.data());
+                                    this.data = JSON.parse(JSON.stringify(this.data)); 
+                                    this.generateCalendar();
+                                }
+                            } catch(e) { }
+                        }, (error) => { this.systemStatus = 'error'; isDbConnected = false; });
+
+                        this.trackVisitRealtime();
+
+                    } catch(e) { 
+                        this.systemStatus = 'error'; 
+                        isDbConnected = false;
+                        this.trackVisitLocal(); 
+                    }
+                },
+
+                async fetchDailyQuote() {
+                    if (!this.isQuotesEnabled) return;
+                    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+                    try {
+                        this.currentQuote = this.koreanQuotesDB[dayOfYear % this.koreanQuotesDB.length];
+                    } catch(e) {
+                        this.currentQuote = { text: "환자의 밝은 미소가 우리의 가장 큰 보람입니다.", author: "노원다인치과병원" };
+                    }
+                },
+                toggleQuotes() {
+                    if (this.isQuotesEnabled) this.fetchDailyQuote();
+                },
+
+                mergeData(source) {
+                    if(!source) return;
+                    const defaultData = JSON.parse(JSON.stringify(this.data));
+                    this.data = { ...defaultData, ...source };
+                    this.data.content = { ...(defaultData.content || {}), ...(source.content || {}) };
+                    this.data.info = { ...(defaultData.info || {}), ...(source.info || {}) };
+                    
+                    if(!this.data.pwd) this.data.pwd = '1234';
+                    if(!this.data.leaveStandard) this.data.leaveStandard = 'join';
+                    if(!this.data.logoUrl) this.data.logoUrl = '';
+                    if(!this.data.employees) this.data.employees = [];
+                    if(!this.data.shiftTypes) this.data.shiftTypes = [];
+                    if(!this.data.qaList) this.data.qaList = [];
+                    if(!this.data.files) this.data.files = [];
+                    if(!this.data.welfares) this.data.welfares = [];
+                    if(!this.data.groups) this.data.groups = [];
+                    if(!this.data.schedules) this.data.schedules = {};
+                    if(!this.data.content.shortcuts) this.data.content.shortcuts = [];
+                },
+
+                loadLocalData() {
+                    try {
+                        let saved = localStorage.getItem('ndain_portal_master_v4');
+                        if (saved) this.mergeData(JSON.parse(saved));
+                    } catch(e) { }
+                },
+
+                async saveDataSilent(context = null) {
+                    if(context) this.updateAlertMessage(context);
+                    let pureData = JSON.parse(JSON.stringify(this.data));
+                    localStorage.setItem('ndain_portal_master_v4', JSON.stringify(pureData));
+                    if(isDbConnected && auth && auth.currentUser) {
+                        try {
+                            const docRef = docFunc(db, 'artifacts', appId, 'public', 'data', 'masterData', 'v4');
+                            await setDoc(docRef, pureData);
+                            this.systemStatus = 'normal';
+                        } catch(e) { this.systemStatus = 'error'; isDbConnected = false; }
+                    }
+                },
+
+                async saveData(context = null) {
+                    if(context) this.updateAlertMessage(context);
+                    else this.updateAlertMessage(this.adminTab); 
+                    let pureData = JSON.parse(JSON.stringify(this.data));
+                    localStorage.setItem('ndain_portal_master_v4', JSON.stringify(pureData));
+                    if(isDbConnected && auth && auth.currentUser) {
+                        try {
+                            const docRef = docFunc(db, 'artifacts', appId, 'public', 'data', 'masterData', 'v4');
+                            await setDoc(docRef, pureData);
+                            this.systemStatus = 'normal';
+                        } catch(e) { this.systemStatus = 'error'; isDbConnected = false; }
+                    }
+                    Swal.fire({ title: '저장 완료', text: '모바일과 PC 화면에 실시간 연동되었습니다.', icon: 'success', timer: 1200, showConfirmButton: false });
+                },
+
+                updateAlertMessage(context) {
+                    let now = new Date();
+                    this.data.content.latestUpdateDate = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                    const map = { 'schedule_edit': '통합 스케줄 편집', 'legend': '메인 달력 설정', 'emp': '직원 및 연차 관리', 'content': '게이트웨이 설정', 'info': '병원 소개', 'welfare': '복리후생', 'files': '사내자료 및 OJT', 'qa': 'Q&A', 'pwd': '시스템 보안' };
+                    let targetName = map[context] || '시스템 통합';
+                    this.data.content.latestUpdateText = `[업데이트] 관리자가 '${targetName}' 내역을 최신으로 업데이트했습니다.`;
+                },
+
+                async trackVisitRealtime() {
+                    let today = new Date().toISOString().slice(0, 10);
+                    let hasVisitedToday = sessionStorage.getItem('visited_' + today);
+                    try {
+                        const statRef = docFunc(db, 'artifacts', appId, 'public', 'data', 'stats', today);
+                        const globalStatRef = docFunc(db, 'artifacts', appId, 'public', 'data', 'stats', 'total');
+                        onSnapshot(statRef, (snap) => { try { if (snap.exists()) this.todayVisits = snap.data().count || 0; } catch(e){} }, (err) => {});
+                        onSnapshot(globalStatRef, (snap) => { try { if (snap.exists()) this.totalVisits = snap.data().count || 0; } catch(e){} }, (err) => {});
+                        if (!hasVisitedToday && auth && auth.currentUser) {
+                            sessionStorage.setItem('visited_' + today, 'true');
+                            try {
+                                await setDoc(statRef, { count: increment(1) }, { merge: true });
+                                await setDoc(globalStatRef, { count: increment(1) }, { merge: true });
+                            } catch(writeErr) { }
+                            this.trackVisitLocalBackup(today);
+                        }
+                    } catch(e) { this.trackVisitLocal(); }
+                },
+                trackVisitLocalBackup(today) {
+                    let stats = JSON.parse(localStorage.getItem('ndain_stats_v4') || '{"total":0}');
+                    if(!stats[today]) stats[today] = { today: 0 };
+                    stats[today].today += 1;
+                    stats.total = (stats.total || 0) + 1;
+                    localStorage.setItem('ndain_stats_v4', JSON.stringify(stats));
+                },
+                trackVisitLocal() {
+                    let today = new Date().toISOString().slice(0, 10);
+                    let hasVisitedToday = sessionStorage.getItem('visited_' + today);
+                    let stats = JSON.parse(localStorage.getItem('ndain_stats_v4') || '{"total":0}');
+                    if(!stats[today]) stats[today] = { today: 0 };
+                    if (!hasVisitedToday) {
+                        stats[today].today += 1;
+                        stats.total = (stats.total || 0) + 1;
+                        localStorage.setItem('ndain_stats_v4', JSON.stringify(stats));
+                        sessionStorage.setItem('visited_' + today, 'true');
+                    }
+                    this.todayVisits = stats[today].today;
+                    this.totalVisits = stats.total;
+                },
+
+                adminLogin() {
+                    if (this.adminPwdInput === (this.data.pwd || '1234')) {
+                        this.isAdminMode = true; this.showAdminLogin = false; this.adminPwdInput = '';
+                        this.adminTab = 'schedule_edit';
+                    } else { Swal.fire('실패', '비밀번호가 일치하지 않습니다.', 'error'); this.adminPwdInput = ''; }
+                },
+                adminLogout() { this.isAdminMode = false; this.activeMenu = 'main'; },
+                updatePassword() {
+                    if (this.pwdChange.current !== (this.data.pwd || '1234')) {
+                        Swal.fire('오류', '현재 비밀번호가 틀렸습니다.', 'error'); return;
+                    }
+                    if (this.pwdChange.new.length < 4) {
+                        Swal.fire('오류', '새 비밀번호는 4자리를 입력하세요.', 'warning'); return;
+                    }
+                    this.data.pwd = this.pwdChange.new;
+                    this.saveData('pwd');
+                    this.pwdChange = { current: '', new: '' };
+                },
+
+                generateCalendar() {
+                    let firstDay = new Date(this.currentYear, this.currentMonth - 1, 1).getDay();
+                    let lastDate = new Date(this.currentYear, this.currentMonth, 0).getDate();
+                    let days = [];
+                    for (let i = 0; i < firstDay; i++) days.push({ id: `e_${i}`, dateStr: null, day: '', dayName: '' });
+                    const dayNames = ['일','월','화','수','목','금','토'];
+                    for (let i = 1; i <= lastDate; i++) {
+                        let dateObj = new Date(this.currentYear, this.currentMonth - 1, i);
+                        let dateStr = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                        days.push({ id: `d_${i}`, dateStr: dateStr, day: i, dayName: dayNames[dateObj.getDay()], isSun: dateObj.getDay() === 0, isSat: dateObj.getDay() === 6 });
+                    }
+                    this.calendarDays = days;
+                },
+                changeMonth(delta) {
+                    this.currentMonth += delta;
+                    if (this.currentMonth > 12) { this.currentMonth = 1; this.currentYear++; } 
+                    else if (this.currentMonth < 1) { this.currentMonth = 12; this.currentYear--; }
+                    this.generateCalendar();
+                },
+
+                isHoliday(dateStr) {
+                    if (!dateStr) return false;
+                    if ((this.data.customHolidays || []).includes(dateStr)) return true;
+                    let dayOfWeek = new Date(dateStr).getDay().toString();
+                    if ((this.data.defaultHolidays || []).includes(dayOfWeek)) return true;
+                    return false;
+                },
+                toggleHoliday(dateStr) {
+                    if(!this.data.customHolidays) this.data.customHolidays = [];
+                    let idx = this.data.customHolidays.indexOf(dateStr);
+                    let dayOfWeek = new Date(dateStr).getDay().toString();
+                    if ((this.data.defaultHolidays || []).includes(dayOfWeek)) { Swal.fire('안내', '해당 요일은 위 기본 세팅에서 체크 해제하세요.', 'info'); return; }
+                    
+                    if (idx > -1) this.data.customHolidays.splice(idx, 1);
+                    else this.data.customHolidays.push(dateStr);
+                    this.saveDataSilent('legend');
+                },
+
+                get filteredEmployees() { return this.selectedGroup === '전체' ? (this.data.employees || []) : (this.data.employees || []).filter(e => e.group === this.selectedGroup); },
+                
+                addGroup() { 
+                    if(this.newGroup && !(this.data.groups||[]).includes(this.newGroup)) { 
+                        this.data.groups.push(this.newGroup); 
+                        this.newGroup = ''; 
+                        this.saveDataSilent('emp'); 
+                    } 
+                },
+
+                renameGroup(oldName, newName, idx) {
+                    if(!newName || newName.trim() === '') {
+                        this.data.groups = [...this.data.groups];
+                        return;
+                    }
+                    if(this.data.groups.includes(newName) && oldName !== newName) {
+                        Swal.fire('알림', '이미 존재하는 직군입니다.', 'warning');
+                        this.data.groups = [...this.data.groups];
+                        return;
+                    }
+                    
+                    this.data.groups[idx] = newName;
+                    
+                    if(this.data.employees) {
+                        this.data.employees.forEach(emp => {
+                            if(emp.group === oldName) {
+                                emp.group = newName;
+                            }
+                        });
+                    }
+                    this.saveDataSilent('emp');
+                },
+
+                addEmployee() {
+                    if(!this.newEmp.group || !this.newEmp.name) { Swal.fire('알림', '직군과 이름을 입력하세요', 'warning'); return; }
+                    if(!this.data.employees) this.data.employees = [];
+                    this.data.employees.push({ id: 'e_' + Date.now(), ...this.newEmp });
+                    this.newEmp = { group: '', name: '', joinDate: '', usedLeaves: 0 };
+                    this.saveDataSilent('emp');
+                },
+                removeEmployee(id) { this.data.employees = (this.data.employees||[]).filter(e => e.id !== id); this.saveDataSilent('emp'); },
+
+                calculateTotalLeaves(joinDateStr) {
+                    if(!joinDateStr) return 0;
+                    let jd = new Date(joinDateStr); let now = new Date();
+                    if (now < jd) return 0; 
+                    let yearsDiff = now.getFullYear() - jd.getFullYear();
+                    if (this.data.leaveStandard === 'fiscal') {
+                        if (yearsDiff === 0) {
+                            let months = now.getMonth() - jd.getMonth();
+                            if (now.getDate() < jd.getDate()) months--;
+                            return Math.max(0, months).toFixed(1);
+                        } else {
+                            let daysInJoinYear = (new Date(jd.getFullYear(), 11, 31) - jd) / (1000 * 60 * 60 * 24) + 1;
+                            let firstYearProrated = 15 * (daysInJoinYear / 365);
+                            if (yearsDiff === 1) return firstYearProrated.toFixed(1);
+                            let base = 15; let extra = Math.floor((yearsDiff - 2) / 2);
+                            return Math.min(base + extra, 25).toFixed(1);
+                        }
+                    } else {
+                        let months = yearsDiff * 12 + (now.getMonth() - jd.getMonth());
+                        if (now.getDate() < jd.getDate()) months--;
+                        if (months < 12) return Math.max(0, months).toFixed(1);
+                        let years = Math.floor(months / 12);
+                        let base = 15; let extra = Math.floor((years - 1) / 2);
+                        return Math.min(base + extra, 25).toFixed(1);
+                    }
+                },
+                calculateUsed(emp) {
+                    let used = parseFloat(emp.usedLeaves || 0);
+                    let currentYearStr = new Date().getFullYear().toString();
+                    let todayStr = new Date().toISOString().slice(0, 10);
+                    if(this.data.schedules && this.data.schedules[emp.id]) {
+                        for(let date in this.data.schedules[emp.id]) {
+                            if(date.startsWith(currentYearStr) && date <= todayStr) {
+                                let code = this.data.schedules[emp.id][date];
+                                let type = (this.data.shiftTypes||[]).find(t => t.code === code);
+                                if(type && type.deduction > 0) used += parseFloat(type.deduction);
+                            }
+                        }
+                    }
+                    return used.toFixed(1);
+                },
+                getRemainLeaves(emp) {
+                    let total = parseFloat(this.calculateTotalLeaves(emp.joinDate));
+                    let used = parseFloat(this.calculateUsed(emp));
+                    return (total - used).toFixed(1);
+                },
+
+                toggleScheduleCell(empId, dateStr) {
+                    if(!this.data.schedules) this.data.schedules = {};
+                    if(!this.data.schedules[empId]) this.data.schedules[empId] = {};
+                    
+                    let currentCode = this.data.schedules[empId][dateStr] || '정상';
+                    let codes = (this.data.shiftTypes || []).map(t => t.code);
+                    let currentIndex = codes.indexOf(currentCode);
+                    let nextIndex = (currentIndex + 1) % codes.length;
+                    let nextCode = codes[nextIndex];
+                    
+                    if(nextCode === '정상' || nextCode === '') {
+                        delete this.data.schedules[empId][dateStr];
+                    } else {
+                        this.data.schedules[empId][dateStr] = nextCode;
+                    }
+                    
+                    this.data.schedules = JSON.parse(JSON.stringify(this.data.schedules));
+                    this.saveDataSilent('schedule_edit'); 
+                },
+                getCellStyle(empId, dateStr) {
+                    let code = (this.data.schedules && this.data.schedules[empId] && this.data.schedules[empId][dateStr]) ? this.data.schedules[empId][dateStr] : '정상';
+                    let type = (this.data.shiftTypes || []).find(t => t.code === code);
+                    if(type && type.code !== '정상') return { text: type.code, bgClass: type.color, textClass: type.bgText };
+                    return { text: '', bgClass: 'bg-transparent', textClass: 'text-gray-800' };
+                },
+
+                getIconClass(name) {
+                    let text = name || '';
+                    if (text.includes('홈페이지')) return 'fa-house';
+                    if (text.includes('블로그')) return 'fa-brands fa-blogger-b';
+                    if (text.includes('페이스북') || text.toLowerCase().includes('facebook')) return 'fa-brands fa-facebook';
+                    if (text.includes('인스타') || text.toLowerCase().includes('instagram')) return 'fa-brands fa-instagram';
+                    if (text.includes('브런치') || text.toLowerCase().includes('brunch')) return 'fa-pen-nib';
+                    if (text.includes('유튜브') || text.toLowerCase().includes('youtube')) return 'fa-brands fa-youtube';
+                    if (text.includes('트위터') || text.toLowerCase().includes('twitter') || text.toLowerCase() === 'x') return 'fa-brands fa-x-twitter';
+                    return 'fa-link';
+                },
+                getShortcutStyle(idx) {
+                    const styles = [
+                        { bg: 'bg-[#4f46e5] hover:bg-[#4338ca]', iconColor: 'text-indigo-500' }, 
+                        { bg: 'bg-[#03c75a] hover:bg-[#02b351]', iconColor: 'text-green-500' }, 
+                        { bg: 'bg-[#ea4335] hover:bg-[#d33426]', iconColor: 'text-red-500' },    
+                        { bg: 'bg-[#f59e0b] hover:bg-[#d97706]', iconColor: 'text-amber-500' },
+                        { bg: 'bg-[#06b6d4] hover:bg-[#0891b2]', iconColor: 'text-cyan-500' },
+                        { bg: 'bg-[#ec4899] hover:bg-[#db2777]', iconColor: 'text-pink-500' },
+                        { bg: 'bg-[#8b5cf6] hover:bg-[#7c3aed]', iconColor: 'text-purple-500' },
+                        { bg: 'bg-[#14b8a6] hover:bg-[#0d9488]', iconColor: 'text-teal-500' }
+                    ];
+                    return styles[idx % styles.length];
+                },
+                addShortcut() {
+                    if(!this.data.content.shortcuts) this.data.content.shortcuts = [];
+                    this.data.content.shortcuts.push({name: '', url: ''});
+                    this.saveDataSilent('content');
+                },
+
+                uploadFile() {
+                    let fileInput = document.getElementById('adminFileInput');
+                    let fileName = this.newFile.name || (fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '');
+                    if (fileName) {
+                        let now = new Date();
+                        if(!this.data.files) this.data.files = [];
+                        this.data.files.unshift({ 
+                            name: fileName, 
+                            desc: this.newFile.desc || '', 
+                            date: `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}` 
+                        });
+                        this.saveDataSilent('files');
+                        this.newFile.name = ''; this.newFile.desc = '';
+                        if(fileInput) fileInput.value = '';
+                    } else { Swal.fire('알림', '파일을 선택하거나 제목을 입력하세요.', 'warning'); }
+                },
+                downloadFile(file) { Swal.fire('다운로드', `'${file.name}' 파일 열기`, 'success'); },
+
+                getWelfareIcon(title) {
+                    let t = title || '';
+                    if (t.includes('의료') || t.includes('진료') || t.includes('병원')) return 'fa-notes-medical text-blue-500';
+                    if (t.includes('경조') || t.includes('축하') || t.includes('조의')) return 'fa-envelope-open-text text-amber-500';
+                    if (t.includes('교육') || t.includes('세미나') || t.includes('학회')) return 'fa-chalkboard-user text-emerald-500';
+                    if (t.includes('휴가') || t.includes('연차') || t.includes('여행') || t.includes('휴식')) return 'fa-plane-departure text-purple-500';
+                    if (t.includes('식사') || t.includes('간식') || t.includes('식대')) return 'fa-utensils text-orange-500';
+                    if (t.includes('차량') || t.includes('교통')) return 'fa-car text-slate-500';
+                    return 'fa-gift text-rose-500';
+                },
+                addWelfare() {
+                    if(this.newWelfare.title) {
+                        if(!this.data.welfares) this.data.welfares = [];
+                        this.data.welfares.push({...this.newWelfare});
+                        this.newWelfare = {title:'', desc:''}; this.saveDataSilent('welfare');
+                    }
+                },
+
+                saveQa() {
+                    if(!this.newQa.title || !this.newQa.content) { Swal.fire('알림', '제목과 내용을 입력하세요.', 'warning'); return; }
+                    if(!this.data.qaList) this.data.qaList = [];
+                    
+                    let fileInput = document.getElementById('qaFileInput');
+                    let attachedFile = (fileInput && fileInput.files.length > 0) ? fileInput.files[0].name : this.newQa.attachedFile;
+
+                    if(this.qaModalMode === 'new') {
+                        if(!this.newQa.pwd) { Swal.fire('알림', '비밀번호를 4자리로 입력하세요.', 'warning'); return; }
+                        let now = new Date();
+                        let maxSeq = 0;
+                        this.data.qaList.forEach(q => { if(q.seqNo && q.seqNo > maxSeq) maxSeq = q.seqNo; });
+                        let nextSeq = maxSeq + 1;
+
+                        this.data.qaList.unshift({
+                            id: 'q_' + Date.now(), seqNo: nextSeq, title: this.newQa.title, content: this.newQa.content, pwd: this.newQa.pwd, answer: '', attachedFile: attachedFile,
+                            date: `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`
+                        });
+                    } else {
+                        let idx = this.data.qaList.findIndex(q => q.id === this.newQa.id);
+                        if(idx > -1) {
+                            this.data.qaList[idx].title = this.newQa.title; this.data.qaList[idx].content = this.newQa.content; this.data.qaList[idx].attachedFile = attachedFile;
+                            if(this.isAdminMode) this.data.qaList[idx].answer = this.newQa.answer;
+                        }
+                    }
+                    this.saveDataSilent('qa'); this.openQaModal = false;
+                    if(fileInput) fileInput.value = '';
+                },
+                verifyQa(action, qa) {
+                    if (this.isAdminMode) {
+                        if(action==='delete') { this.data.qaList = this.data.qaList.filter(q => q.id !== qa.id); this.saveDataSilent('qa'); }
+                        if(action==='edit') { this.qaModalMode = 'edit'; this.newQa = {...qa}; this.openQaModal = true; }
+                        return;
+                    }
+                    Swal.fire({ title: '보안 비밀번호 확인', text:'(공용 비밀번호 입력)', input: 'password', showCancelButton: true, confirmButtonText: '확인', inputAttributes: { maxlength: 4, autocapitalize: 'off', autocorrect: 'off' }})
+                    .then(res => {
+                        if(res.value === (this.data.pwd || '1234') || res.value === qa.pwd) {
+                            if(action==='delete') { this.data.qaList = this.data.qaList.filter(q => q.id !== qa.id); this.saveDataSilent('qa'); }
+                            if(action==='edit') { this.qaModalMode = 'edit'; this.newQa = {...qa}; this.openQaModal = true; }
+                        } else if(res.value) Swal.fire('실패', '비밀번호가 틀렸습니다.', 'error');
+                    });
+                },
+
+                downloadExcel(type) {
+                    if (type === 'emp' && window.XLSX) {
+                        let rows = [['No.', '직군', '이름', '입사일', '총발생연차', '총사용연차', '잔여연차']];
+                        (this.data.employees || []).forEach((e, idx) => {
+                            rows.push([idx+1, e.group, e.name, e.joinDate, this.calculateTotalLeaves(e.joinDate), this.calculateUsed(e), this.getRemainLeaves(e)]);
+                        });
+                        let ws = XLSX.utils.aoa_to_sheet(rows);
+                        let wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "연차현황");
+                        XLSX.writeFile(wb, `직원_연차_현황_${new Date().toISOString().slice(0,10)}.xlsx`);
+                    } else if (type === 'schedule' && window.XLSX) {
+                        let rows = [['직군', '이름', '잔여연차']];
+                        let days = this.calendarDays.filter(d => d.dateStr !== null).map(d => `${d.day}일`);
+                        rows[0].push(...days);
+                        
+                        (this.data.employees || []).forEach(emp => {
+                            let row = [emp.group, emp.name, this.getRemainLeaves(emp)];
+                            this.calendarDays.filter(d => d.dateStr !== null).forEach(d => {
+                                row.push(this.isHoliday(d.dateStr) ? '휴무' : this.getCellStyle(emp.id, d.dateStr).text);
+                            });
+                            rows.push(row);
+                        });
+                        let ws = XLSX.utils.aoa_to_sheet(rows);
+                        let wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "통합스케줄");
+                        XLSX.writeFile(wb, `통합스케줄_${this.currentYear}년_${this.currentMonth}월.xlsx`);
+                    }
+                },
+
+                renderStatChart() {
+                    let stats = JSON.parse(localStorage.getItem('ndain_stats_v4') || '{"total":0}');
+                    let targetDateObj = new Date(this.statDate);
+                    
+                    let label1 = '', data1 = 0;
+                    
+                    if (this.statType === 'day') {
+                        label1 = '선택일 조회수';
+                        data1 = stats[this.statDate]?.today || 0;
+                    } 
+                    else if (this.statType === 'week') {
+                        label1 = '최근 7일 조회수';
+                        for(let i=0; i<7; i++) {
+                            let d = new Date(targetDateObj);
+                            d.setDate(d.getDate() - i);
+                            let dStr = d.toISOString().slice(0,10);
+                            data1 += (stats[dStr]?.today || 0);
+                        }
+                    }
+                    else if (this.statType === 'month') {
+                        label1 = '해당월 조회수';
+                        let monthPrefix = this.statDate.slice(0, 7);
+                        for(let key in stats) {
+                            if(key.startsWith(monthPrefix)) data1 += (stats[key].today || 0);
+                        }
+                    }
+                    else if (this.statType === 'year') {
+                        label1 = '해당연도 조회수';
+                        let yearPrefix = this.statDate.slice(0, 4);
+                        for(let key in stats) {
+                            if(key.startsWith(yearPrefix)) data1 += (stats[key].today || 0);
+                        }
+                    }
+                    
+                    if (window.Chart) {
+                        setTimeout(() => {
+                            let ctx = document.getElementById('statChart');
+                            if(window.myChart) window.myChart.destroy();
+                            window.myChart = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: [label1, '시스템 총 누적 접속수'],
+                                    datasets: [{ 
+                                        label: '접속 횟수 (세션 기준)', 
+                                        data: [data1, stats.total || this.totalVisits], 
+                                        backgroundColor: ['rgba(147, 51, 234, 0.6)', 'rgba(59, 130, 246, 0.6)'], 
+                                        borderColor: ['rgb(147, 51, 234)', 'rgb(37, 99, 235)'], 
+                                        borderWidth: 1.5,
+                                        borderRadius: 6
+                                    }]
+                                },
+                                options: { 
+                                    responsive: true, 
+                                    maintainAspectRatio: false, 
+                                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                                    plugins: { legend: { display: false } }
+                                }
+                            });
+                        }, 50);
+                        this.showChart = true;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
